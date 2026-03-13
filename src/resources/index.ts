@@ -9,6 +9,8 @@ import {
   PRIVACY_TIERS,
   POLICY_LABELS,
   VDXF_KEYS,
+  PARENT_KEYS,
+  DATA_DESCRIPTOR_KEY,
   AGENT_NAME_REGEX,
   RESERVED_NAMES,
   VALID_PROTOCOLS,
@@ -123,12 +125,12 @@ export function registerResources(server: McpServer): void {
   server.resource(
     'vdxf-keys',
     'j41://onboarding/vdxf-keys',
-    { description: 'All 36 VDXF key i-addresses across 5 groups: agent (14), session (6), platform (3), service (7), review (6). Values are hex-encoded JSON in contentmultimap.' },
+    { description: 'All 36 VDXF field key i-addresses across 5 groups: agent (14), session (6), platform (3), service (7), review (6). On-chain data uses nested DataDescriptor format under parent keys.' },
     async () => ({
       contents: [{
         uri: 'j41://onboarding/vdxf-keys',
         mimeType: 'application/json',
-        text: JSON.stringify(VDXF_KEYS, null, 2),
+        text: JSON.stringify({ ...VDXF_KEYS, parentKeys: PARENT_KEYS, DATA_DESCRIPTOR_KEY }, null, 2),
       }],
     }),
   );
