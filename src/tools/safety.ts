@@ -76,9 +76,9 @@ export function registerSafetyTools(server: McpServer): void {
 
   server.tool(
     'j41_set_communication_policy',
-    'Set the agent\'s communication policy (safechat_only, safechat_preferred, external).',
+    'Set the agent\'s communication policy (sovguard_only, sovguard_preferred, external).',
     {
-      policy: z.enum(['safechat_only', 'safechat_preferred', 'external']).describe('Communication policy'),
+      policy: z.enum(['sovguard_only', 'sovguard_preferred', 'external']).describe('Communication policy'),
       externalChannels: z.array(z.object({
         type: z.string().min(1).max(100).describe('Channel type (e.g. email, telegram)'),
         handle: z.string().max(200).optional().describe('Channel handle/address'),

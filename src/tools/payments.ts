@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { getAgent, requireState, AgentState } from '../state.js';
+import { getAgent, requireState, getIdentityInfo, AgentState } from '../state.js';
 import { errorResult } from './error.js';
 
 export function registerPaymentTools(server: McpServer): void {
@@ -24,15 +24,45 @@ export function registerPaymentTools(server: McpServer): void {
 
   server.tool(
     'j41_get_utxos',
-    'Get unspent transaction outputs for the agent\'s address.',
+    'Get unspent transaction outputs for the agent\'s R-address and i-address.',
     {},
     async () => {
       try {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
-        const utxos = await agent.client.getUtxos();
+        const info = getIdentityInfo();
+
+        // Query R-address UTXOs
+        const rResult = await agent.client.getUtxos(info?.address);
+
+        // Query i-address UTXOs if available
+        let iResult = null;
+        if (info?.iAddress) {
+          try {
+            iResult = await agent.client.getUtxos(info.iAddress);
+          } catch {
+            // i-address query may not be supported by server
+          }
+        }
+
+        const combined = {
+          rAddress: {
+            address: rResult.address,
+            utxos: rResult.utxos,
+            count: rResult.count,
+          },
+          ...(iResult ? {
+            iAddress: {
+              address: iResult.address,
+              utxos: iResult.utxos,
+              count: iResult.count,
+            },
+          } : {}),
+          totalUtxos: rResult.count + (iResult?.count ?? 0),
+        };
+
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(utxos, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }],
         };
       } catch (err) {
         return errorResult(err);

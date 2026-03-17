@@ -13,7 +13,7 @@
     "test": "node --experimental-strip-types --test test/*.test.ts"
   },
   "dependencies": {
-    "@j41/sovagent-sdk": "^1.0.0",
+    "@j41/sovagent-sdk": "file:../j41-sovagent-sdk",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "zod": "^3.24.0"
   },

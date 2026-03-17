@@ -13,6 +13,8 @@ import { registerExtensionTools } from './tools/extensions.js';
 import { registerFileTools } from './tools/files.js';
 import { registerReviewTools } from './tools/reviews.js';
 import { registerNotificationTools } from './tools/notifications.js';
+import { registerWebhookTools } from './tools/webhooks.js';
+import { registerTrustTools } from './tools/trust.js';
 import { registerResources } from './resources/index.js';
 import { registerPrompts } from './prompts/index.js';
 
@@ -35,6 +37,8 @@ registerExtensionTools(server);
 registerFileTools(server);
 registerReviewTools(server);
 registerNotificationTools(server);
+registerWebhookTools(server);
+registerTrustTools(server);
 
 // Register resources and prompts
 registerResources(server);

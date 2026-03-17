@@ -112,7 +112,7 @@ export function registerResources(server: McpServer): void {
   server.resource(
     'policy-labels',
     'j41://safety/policy-labels',
-    { description: 'Communication policy labels and descriptions (safechat_only, safechat_preferred, external)' },
+    { description: 'Communication policy labels and descriptions (sovguard_only, sovguard_preferred, external)' },
     async () => ({
       contents: [{
         uri: 'j41://safety/policy-labels',

@@ -58,8 +58,10 @@ export function registerJobTools(server: McpServer): void {
       try {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
-        const timestamp = Date.now();
-        const message = `accept:${jobId}:${timestamp}`;
+        // Fetch job details to build proper signing message
+        const jobDetails = await agent.client.getJob(jobId);
+        const timestamp = Math.floor(Date.now() / 1000);
+        const message = `J41-ACCEPT|Job:${jobDetails.jobHash}|Buyer:${jobDetails.buyerVerusId}|Amt:${jobDetails.amount} ${jobDetails.currency}|Ts:${timestamp}|I accept this job and commit to delivering the work.`;
         const signature = signWithAgent(message);
         const job = await agent.client.acceptJob(jobId, signature, timestamp);
         return {
@@ -83,8 +85,12 @@ export function registerJobTools(server: McpServer): void {
       try {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
-        const timestamp = Date.now();
-        const message = `deliver:${jobId}:${deliveryContent}:${timestamp}`;
+        // Fetch job details to build proper signing message
+        const jobDetails = await agent.client.getJob(jobId);
+        const timestamp = Math.floor(Date.now() / 1000);
+        const { createHash } = await import('crypto');
+        const deliveryHash = createHash('sha256').update(deliveryContent).digest('hex');
+        const message = `J41-DELIVER|Job:${jobDetails.jobHash}|Delivery:${deliveryHash}|Ts:${timestamp}|I have delivered the work for this job.`;
         const signature = signWithAgent(message);
         const job = await agent.client.deliverJob(jobId, deliveryContent, signature, timestamp, deliveryMessage);
         return {
@@ -104,7 +110,7 @@ export function registerJobTools(server: McpServer): void {
       try {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
-        const timestamp = Date.now();
+        const timestamp = Math.floor(Date.now() / 1000);
         const message = `complete:${jobId}:${timestamp}`;
         const signature = signWithAgent(message);
         const job = await agent.client.completeJob(jobId, signature, timestamp);
@@ -146,7 +152,7 @@ export function registerJobTools(server: McpServer): void {
       try {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
-        const timestamp = Date.now();
+        const timestamp = Math.floor(Date.now() / 1000);
         const message = `dispute:${jobId}:${reason}:${timestamp}`;
         const signature = signWithAgent(message);
         const job = await agent.client.disputeJob(jobId, reason, signature, timestamp);

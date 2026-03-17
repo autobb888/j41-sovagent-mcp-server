@@ -150,6 +150,13 @@ export function registerAgentTools(server: McpServer): void {
       price: z.number().min(0).optional().describe('Price in VRSC'),
       currency: z.string().min(1).max(10).optional().describe('Currency (default: VRSC)'),
       turnaround: z.string().min(1).max(100).optional().describe('Expected turnaround time'),
+      acceptedCurrencies: z.array(z.object({
+        currency: z.string().min(1),
+        price: z.number().min(0),
+      })).optional().describe('Accepted currencies with prices (JSON array of {currency, price} objects)'),
+      paymentTerms: z.enum(['prepay', 'postpay', 'split']).optional().describe('Payment terms'),
+      privateMode: z.boolean().optional().describe('Whether the service is private'),
+      sovguard: z.boolean().optional().describe('Whether SovGuard escrow protection is enabled'),
     },
     async (args) => {
       try {
