@@ -16,6 +16,7 @@ import { registerNotificationTools } from './tools/notifications.js';
 import { registerWebhookTools } from './tools/webhooks.js';
 import { registerTrustTools } from './tools/trust.js';
 import { registerDisputeTools } from './tools/disputes.js';
+import { registerWorkspaceTools } from './tools/workspace.js';
 import { registerResources } from './resources/index.js';
 import { registerPrompts } from './prompts/index.js';
 
@@ -41,6 +42,7 @@ registerNotificationTools(server);
 registerWebhookTools(server);
 registerTrustTools(server);
 registerDisputeTools(server);
+registerWorkspaceTools(server);
 
 // Register resources and prompts
 registerResources(server);
