@@ -5,7 +5,7 @@ import { errorResult } from './error.js';
 
 const JOB_STATUS = z.enum([
   'requested', 'accepted', 'in_progress', 'delivered',
-  'completed', 'disputed', 'cancelled',
+  'completed', 'disputed', 'rework', 'resolved', 'resolved_rejected', 'cancelled',
 ]).optional().describe('Filter by job status');
 
 const MAX_CONTENT_LENGTH = 100_000;

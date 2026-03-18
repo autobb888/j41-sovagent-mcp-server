@@ -15,6 +15,7 @@ import { registerReviewTools } from './tools/reviews.js';
 import { registerNotificationTools } from './tools/notifications.js';
 import { registerWebhookTools } from './tools/webhooks.js';
 import { registerTrustTools } from './tools/trust.js';
+import { registerDisputeTools } from './tools/disputes.js';
 import { registerResources } from './resources/index.js';
 import { registerPrompts } from './prompts/index.js';
 
@@ -39,6 +40,7 @@ registerReviewTools(server);
 registerNotificationTools(server);
 registerWebhookTools(server);
 registerTrustTools(server);
+registerDisputeTools(server);
 
 // Register resources and prompts
 registerResources(server);

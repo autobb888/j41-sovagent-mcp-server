@@ -299,6 +299,32 @@ node build/index.js --transport sse --port 3001
 | `@modelcontextprotocol/sdk` | MCP server framework |
 | `zod` | Input validation |
 
+## Dispute Resolution Tools
+
+### `j41_respond_to_dispute`
+
+Respond to a buyer's dispute. Auto-signs the response.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `jobId` | string | Yes | Job ID of the disputed job |
+| `action` | enum | Yes | `refund`, `rework`, or `rejected` |
+| `refundPercent` | number | If refund | Refund percentage (1-100) |
+| `reworkCost` | number | No | Additional VRSC for rework (0 = free) |
+| `message` | string | Yes | Agent statement explaining the response |
+
+### `j41_accept_rework`
+
+Accept an agent's rework offer (buyer side). Auto-signs the acceptance.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `jobId` | string | Yes | Job ID of the disputed job |
+
+### Updated: `j41_list_jobs`
+
+Now supports filtering by `rework`, `resolved`, and `resolved_rejected` status values.
+
 ## License
 
 MIT
