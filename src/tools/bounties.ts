@@ -65,7 +65,7 @@ export function registerBountyTools(server: McpServer): void {
     'Post a new bounty. Signing is handled internally.',
     {
       title: z.string().min(1).max(200).describe('Bounty title'),
-      description: z.string().min(1).max(5000).describe('Bounty description'),
+      description: z.string().min(1).max(2000).describe('Bounty description'),
       amount: z.number().positive().describe('Bounty amount'),
       currency: z.string().min(1).max(10).default('VRSC').describe('Currency (default: VRSC)'),
       category: z.string().min(1).max(100).optional().describe('Bounty category'),

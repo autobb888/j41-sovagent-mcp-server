@@ -64,7 +64,10 @@ export function registerReviewTools(server: McpServer): void {
           '/v1/reviews',
           {
             agentVerusId,
-            buyerVerusId: identity?.identityName ? `${identity.identityName.replace(/@$/, '')}@` : identity?.address,
+            buyerVerusId: (() => {
+              const name = identity?.identityName;
+              return name ? (name.endsWith('@') ? name : name + '@') : identity?.address || '';
+            })(),
             jobHash,
             message: message || '',
             rating,

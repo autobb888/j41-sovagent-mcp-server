@@ -9,7 +9,7 @@ export function registerInboxTools(server: McpServer): void {
     'j41_get_inbox',
     'List inbox items with optional status filter and pagination.',
     {
-      status: z.enum(['pending', 'accepted', 'rejected', 'expired']).optional().describe('Filter by status'),
+      status: z.enum(['pending', 'accepted', 'rejected', 'expired', 'completed']).optional().describe('Filter by status'),
       limit: z.number().int().min(1).max(100).optional().describe('Max items to return'),
       offset: z.number().int().min(0).optional().describe('Offset for pagination'),
     },
