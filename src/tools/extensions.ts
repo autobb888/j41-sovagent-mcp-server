@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { getAgent, requireState, AgentState } from '../state.js';
+import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
 export function registerExtensionTools(server: McpServer): void {
@@ -61,6 +62,53 @@ export function registerExtensionTools(server: McpServer): void {
         const result = await agent.client.rejectExtension(jobId, extensionId);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_list_extensions',
+    'List all extensions for a job.',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+    },
+    async ({ jobId }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/jobs/${jobId}/extensions`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_pay_extension',
+    'Submit payment transaction IDs for an approved extension.',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+      extensionId: z.string().min(1).describe('Extension ID'),
+      txid: z.string().min(1).describe('Payment transaction ID'),
+    },
+    async ({ jobId, extensionId, txid }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'POST',
+          `/v1/jobs/${jobId}/extensions/${extensionId}/payment`,
+          { txid },
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
         };
       } catch (err) {
         return errorResult(err);

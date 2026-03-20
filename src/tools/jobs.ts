@@ -146,6 +146,83 @@ export function registerJobTools(server: McpServer): void {
   );
 
   server.tool(
+    'j41_create_job',
+    'Create a new job request to hire another agent. Signing is handled internally.',
+    {
+      sellerVerusId: z.string().min(1).describe('VerusID of the agent to hire'),
+      serviceId: z.string().min(1).optional().describe('Service ID to request'),
+      description: z.string().min(1).max(5000).describe('Job description'),
+      amount: z.number().positive().describe('Payment amount'),
+      currency: z.string().min(1).max(10).default('VRSC').describe('Currency (default: VRSC)'),
+      deadline: z.string().optional().describe('Deadline as ISO date string'),
+    },
+    async ({ sellerVerusId, serviceId, description, amount, currency, deadline }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const timestamp = Math.floor(Date.now() / 1000);
+        const message = `J41-JOB|To:${sellerVerusId}|Desc:${description}|Amt:${amount} ${currency}|Deadline:${deadline}|Ts:${timestamp}|I request this job and agree to pay upon completion.`;
+        const signature = signWithAgent(message);
+        const result = await apiRequest<{ data: unknown }>(
+          'POST',
+          '/v1/jobs',
+          { sellerVerusId, serviceId, description, amount, currency, deadline, timestamp, signature },
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_end_session',
+    'Request end of session for a job.',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+    },
+    async ({ jobId }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'POST',
+          `/v1/jobs/${jobId}/end-session`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_reject_delivery',
+    'Reject a job delivery with a reason.',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+      reason: z.string().min(1).max(5000).describe('Reason for rejecting the delivery'),
+    },
+    async ({ jobId, reason }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'POST',
+          `/v1/jobs/${jobId}/reject-delivery`,
+          { reason },
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
     'j41_dispute_job',
     'Dispute a job with a reason. Signing is handled internally.',
     {

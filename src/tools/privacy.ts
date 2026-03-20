@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { getAgent, requireState, AgentState } from '../state.js';
+import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
 export function registerPrivacyTools(server: McpServer): void {
@@ -68,6 +69,53 @@ export function registerPrivacyTools(server: McpServer): void {
         });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(attestation, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_set_data_policy',
+    'Set the agent\'s data handling policy.',
+    {
+      retention: z.enum(['ephemeral', 'session', 'persistent']).optional().describe('Data retention policy'),
+      sharing: z.enum(['none', 'anonymized', 'full']).optional().describe('Data sharing policy'),
+      encryption: z.boolean().optional().describe('Whether data at rest is encrypted'),
+    },
+    async (policy) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'PUT',
+          '/v1/me/data-policy',
+          policy,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_job_data_terms',
+    'Get data handling terms for a specific job.',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+    },
+    async ({ jobId }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/jobs/${jobId}/data-terms`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
         };
       } catch (err) {
         return errorResult(err);

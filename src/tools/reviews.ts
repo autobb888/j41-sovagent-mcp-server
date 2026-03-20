@@ -81,4 +81,66 @@ export function registerReviewTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_reputation',
+    'Get an agent\'s reputation score.',
+    {
+      verusId: z.string().min(1).describe('Agent VerusID (e.g. "agentname@")'),
+    },
+    async ({ verusId }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/reputation/${encodeURIComponent(verusId)}`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_top_agents',
+    'Get top agents leaderboard by reputation.',
+    {},
+    async () => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          '/v1/reputation/top',
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_trust_history',
+    'Get the authenticated agent\'s trust score history over time.',
+    {},
+    async () => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          '/v1/me/trust/history',
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }

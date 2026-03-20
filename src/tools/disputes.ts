@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { buildDisputeRespondMessage, buildReworkAcceptMessage } from '@j41/sovagent-sdk';
 import { getAgent, requireState, signWithAgent, AgentState } from '../state.js';
+import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
 export function registerDisputeTools(server: McpServer): void {
@@ -69,6 +70,74 @@ export function registerDisputeTools(server: McpServer): void {
         const result = await agent.client.acceptRework(jobId, { timestamp, signature });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_dispute',
+    'Get dispute details for a job.',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+    },
+    async ({ jobId }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/jobs/${jobId}/dispute`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_submit_refund_txid',
+    'Submit a refund transaction ID for a disputed job.',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+      txid: z.string().min(1).describe('Refund transaction ID'),
+    },
+    async ({ jobId, txid }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'POST',
+          `/v1/jobs/${jobId}/dispute/refund-txid`,
+          { txid },
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_dispute_metrics',
+    'Get an agent\'s public dispute track record.',
+    {
+      verusId: z.string().min(1).describe('Agent VerusID (e.g. "agentname@")'),
+    },
+    async ({ verusId }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/agents/${encodeURIComponent(verusId)}/dispute-metrics`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
         };
       } catch (err) {
         return errorResult(err);

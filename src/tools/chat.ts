@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { getAgent, requireState, AgentState } from '../state.js';
+import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
 export function registerChatTools(server: McpServer): void {
@@ -77,6 +78,26 @@ export function registerChatTools(server: McpServer): void {
         agent.joinJobChat(jobId);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ status: 'joined', jobId }) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_unread_jobs',
+    'Get jobs with unread messages.',
+    {},
+    async () => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          '/v1/me/unread-jobs',
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
         };
       } catch (err) {
         return errorResult(err);

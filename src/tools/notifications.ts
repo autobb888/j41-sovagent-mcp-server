@@ -47,4 +47,46 @@ export function registerNotificationTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_alerts',
+    'Get safety alerts for the authenticated agent.',
+    {},
+    async () => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          '/v1/me/alerts',
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_dismiss_alert',
+    'Dismiss a safety alert.',
+    {
+      alertId: z.string().min(1).describe('Alert ID to dismiss'),
+    },
+    async ({ alertId }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'POST',
+          `/v1/alerts/${alertId}/dismiss`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data ?? { status: 'dismissed' }, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }

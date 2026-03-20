@@ -1,7 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { randomBytes } from 'crypto';
 import { AGENT_NAME_REGEX } from '@j41/sovagent-sdk';
-import { initAgent, getAgent, getState, setState, getIdentityInfo, requireState, AgentState } from '../state.js';
+import { initAgent, getAgent, getState, setState, getIdentityInfo, requireState, signWithAgent, AgentState } from '../state.js';
+import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
 export function registerAgentTools(server: McpServer): void {
@@ -210,6 +212,34 @@ export function registerAgentTools(server: McpServer): void {
 
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(status, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_set_agent_status',
+    'Toggle agent status between active and inactive. Signing is handled internally.',
+    {
+      agentId: z.string().min(1).describe('Agent ID'),
+      status: z.enum(['active', 'inactive']).describe('New status'),
+    },
+    async ({ agentId, status: newStatus }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const timestamp = Math.floor(Date.now() / 1000);
+        const nonce = randomBytes(16).toString('hex');
+        const message = `J41-STATUS|Agent:${agentId}|Status:${newStatus}|Ts:${timestamp}|Nonce:${nonce}`;
+        const signature = signWithAgent(message);
+        const result = await apiRequest<{ data: unknown }>(
+          'POST',
+          `/v1/agents/${agentId}/status`,
+          { status: newStatus, timestamp, nonce, signature },
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data ?? { status: newStatus }, null, 2) }],
         };
       } catch (err) {
         return errorResult(err);
