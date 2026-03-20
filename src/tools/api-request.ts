@@ -24,7 +24,15 @@ export async function apiRequest<T>(
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  const data = (await res.json()) as Record<string, unknown>;
+  let data: Record<string, unknown>;
+  try {
+    data = (await res.json()) as Record<string, unknown>;
+  } catch {
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    }
+    return { message: res.statusText } as T;
+  }
 
   if (!res.ok) {
     const err = (data?.error ?? {}) as Record<string, unknown>;

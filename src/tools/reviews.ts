@@ -64,7 +64,7 @@ export function registerReviewTools(server: McpServer): void {
           '/v1/reviews',
           {
             agentVerusId,
-            buyerVerusId: identity?.identityName ? `${identity.identityName}@` : identity?.address,
+            buyerVerusId: identity?.identityName ? `${identity.identityName.replace(/@$/, '')}@` : identity?.address,
             jobHash,
             message: message || '',
             rating,

@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { getAgent, requireState, signWithAgent, AgentState } from '../state.js';
+import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
 const JOB_STATUS = z.enum([
@@ -61,7 +62,7 @@ export function registerJobTools(server: McpServer): void {
         // Fetch job details to build proper signing message
         const jobDetails = await agent.client.getJob(jobId);
         const timestamp = Math.floor(Date.now() / 1000);
-        const message = `J41-ACCEPT|Job:${jobDetails.jobHash}|Buyer:${jobDetails.buyerVerusId}|Amt:${jobDetails.amount} ${jobDetails.currency}|Ts:${timestamp}|I accept this job and commit to delivering the work.`;
+        const message = `J41-ACCEPT|Job:${jobDetails.jobHash}|Ts:${timestamp}|I accept this job and commit to delivering.`;
         const signature = signWithAgent(message);
         const job = await agent.client.acceptJob(jobId, signature, timestamp);
         return {
@@ -90,7 +91,7 @@ export function registerJobTools(server: McpServer): void {
         const timestamp = Math.floor(Date.now() / 1000);
         const { createHash } = await import('crypto');
         const deliveryHash = createHash('sha256').update(deliveryContent).digest('hex');
-        const message = `J41-DELIVER|Job:${jobDetails.jobHash}|Delivery:${deliveryHash}|Ts:${timestamp}|I have delivered the work for this job.`;
+        const message = `J41-DELIVER|Job:${jobDetails.jobHash}|Hash:${deliveryHash}|Ts:${timestamp}|I have delivered the work as described.`;
         const signature = signWithAgent(message);
         const job = await agent.client.deliverJob(jobId, deliveryContent, signature, timestamp, deliveryMessage);
         return {
@@ -110,8 +111,11 @@ export function registerJobTools(server: McpServer): void {
       try {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
+        // Fetch job details to get jobHash for correct signing format
+        const jobData = await apiRequest<{ data: { jobHash: string } }>('GET', `/v1/jobs/${jobId}`);
+        const jobHash = jobData.data.jobHash;
         const timestamp = Math.floor(Date.now() / 1000);
-        const message = `complete:${jobId}:${timestamp}`;
+        const message = `J41-COMPLETE|Job:${jobHash}|Ts:${timestamp}|I confirm the work has been delivered satisfactorily.`;
         const signature = signWithAgent(message);
         const job = await agent.client.completeJob(jobId, signature, timestamp);
         return {
@@ -152,8 +156,11 @@ export function registerJobTools(server: McpServer): void {
       try {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
+        // Fetch job details to get jobHash for correct signing format
+        const jobData = await apiRequest<{ data: { jobHash: string } }>('GET', `/v1/jobs/${jobId}`);
+        const jobHash = jobData.data.jobHash;
         const timestamp = Math.floor(Date.now() / 1000);
-        const message = `dispute:${jobId}:${reason}:${timestamp}`;
+        const message = `J41-DISPUTE|Job:${jobHash}|Reason:${reason}|Ts:${timestamp}|I am raising a dispute on this job.`;
         const signature = signWithAgent(message);
         const job = await agent.client.disputeJob(jobId, reason, signature, timestamp);
         return {

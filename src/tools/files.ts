@@ -35,6 +35,9 @@ export function registerFileTools(server: McpServer): void {
       try {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
+        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(content)) {
+          throw new Error('Invalid base64 content — must contain only base64 characters');
+        }
         const data = Buffer.from(content, 'base64');
         const result = await agent.uploadFileData(jobId, data, filename, mimeType);
         return {

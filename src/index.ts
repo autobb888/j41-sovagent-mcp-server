@@ -16,7 +16,7 @@ import { registerNotificationTools } from './tools/notifications.js';
 import { registerWebhookTools } from './tools/webhooks.js';
 import { registerTrustTools } from './tools/trust.js';
 import { registerDisputeTools } from './tools/disputes.js';
-import { registerWorkspaceTools } from './tools/workspace.js';
+import { registerWorkspaceTools, disconnectAllWorkspaces } from './tools/workspace.js';
 import { registerResources } from './resources/index.js';
 import { registerPrompts } from './prompts/index.js';
 
@@ -66,6 +66,18 @@ async function main(): Promise<void> {
     console.error('MCP J41 server running on stdio');
   }
 }
+
+// Graceful shutdown — disconnect all workspace connections
+process.on('SIGTERM', () => {
+  console.error('Received SIGTERM — disconnecting workspaces');
+  disconnectAllWorkspaces();
+  process.exit(0);
+});
+process.on('SIGINT', () => {
+  console.error('Received SIGINT — disconnecting workspaces');
+  disconnectAllWorkspaces();
+  process.exit(0);
+});
 
 main().catch((err) => {
   console.error('Fatal error:', err);

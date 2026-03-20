@@ -77,6 +77,9 @@ export function registerPaymentTools(server: McpServer): void {
     async ({ rawhex }) => {
       try {
         requireState(AgentState.Authenticated);
+        if (!/^[0-9a-fA-F]+$/.test(rawhex)) {
+          throw new Error('Invalid rawhex — must contain only hexadecimal characters');
+        }
         const agent = getAgent();
         const result = await agent.client.broadcast(rawhex);
         return {

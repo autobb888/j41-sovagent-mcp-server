@@ -1,6 +1,6 @@
 # j41-mcp-server
 
-MCP server for the **Junction41** -- wraps the [`@j41/sovagent-sdk`](https://github.com/autobb888/j41-sdk) as Model Context Protocol tools, allowing Claude and other LLMs to interact with the Junction41 platform. Exposes 49 tools, 10 resources, and 3 workflow prompts.
+MCP server for the **Junction41** -- wraps the [`@j41/sovagent-sdk`](https://github.com/autobb888/j41-sovagent-sdk) as Model Context Protocol tools, allowing Claude and other LLMs to interact with the Junction41 platform. Exposes 57 tools, 10 resources, and 3 workflow prompts.
 
 Works with Claude Desktop, Claude Code, OpenAI agents, Cursor, Windsurf, and any other client that speaks the [Model Context Protocol](https://modelcontextprotocol.io/).
 
@@ -59,15 +59,15 @@ CORS is restricted to localhost by default. Set `J41_CORS_ORIGIN` to override:
 J41_CORS_ORIGIN="https://myapp.example.com" node build/index.js --transport sse --port 3001
 ```
 
-## Tools (49)
+## Tools (57)
 
 ### Identity (stateless)
 
 | Tool | Description |
 |------|-------------|
-| `j41_generate_keypair` | Generate a new Verus keypair (WIF, pubkey, R-address) |
-| `j41_sign_message` | Sign an arbitrary message with a WIF key |
-| `j41_sign_challenge` | Sign a J41 authentication challenge |
+| `j41_generate_keypair` | Generate a new Verus keypair (address + pubkey; WIF stored internally) |
+| `j41_sign_message` | Sign a message (uses stored WIF by default, or accepts explicit WIF) |
+| `j41_sign_challenge` | Sign a J41 authentication challenge (uses stored WIF by default) |
 
 ### Agent Lifecycle
 
@@ -91,6 +91,20 @@ J41_CORS_ORIGIN="https://myapp.example.com" node build/index.js --transport sse 
 | `j41_complete_job` | Mark job completed (signs internally) |
 | `j41_cancel_job` | Cancel a job |
 | `j41_dispute_job` | Dispute a job with reason (signs internally) |
+
+### Workspace
+
+| Tool | Description |
+|------|-------------|
+| `j41_workspace_connect` | Connect to buyer's local project via workspace relay |
+| `j41_workspace_list_directory` | List files in buyer's project directory |
+| `j41_workspace_read_file` | Read a file from buyer's project |
+| `j41_workspace_write_file` | Write a file (buyer approves in supervised mode, 500KB limit) |
+| `j41_workspace_status` | Check workspace session status |
+| `j41_workspace_done` | Signal work complete and disconnect |
+| `j41_workspace_disconnect` | Explicitly disconnect from workspace |
+
+Path traversal protection: relative paths only, `..` segments rejected.
 
 ### Chat
 
@@ -267,7 +281,7 @@ State transitions are forward-only. The WIF private key is stored in the state m
 
 ### Security
 
-- **WIF handling**: Only `j41_generate_keypair` returns a WIF (one-time generation). `j41_init_agent` accepts WIF but never echoes it. All job signing happens internally via `signWithAgent()`.
+- **WIF handling**: `j41_generate_keypair` stores the WIF internally and only returns the address. `j41_init_agent` accepts WIF but never echoes it. All job signing happens internally via `signWithAgent()`. Signing tools use the stored key by default.
 - **Input validation**: All tool inputs validated by Zod schemas with length limits, enum constraints, and regex patterns.
 - **Error handling**: Shared `errorResult()` extracts J41Error codes without leaking stack traces.
 - **SSE CORS**: Restricted to localhost by default (configurable via `J41_CORS_ORIGIN`).

@@ -23,6 +23,21 @@ function getWorkspace(jobId: string): WorkspaceClient {
   return ws;
 }
 
+/** Reject paths containing '..' or starting with '/' to prevent path traversal. */
+function validatePath(p: string): void {
+  if (p.includes('..') || p.startsWith('/')) {
+    throw new Error('Invalid path: must be relative and cannot contain ".."');
+  }
+}
+
+/** Disconnect all active workspace connections. Used during process shutdown. */
+export function disconnectAllWorkspaces(): void {
+  for (const [jobId, ws] of workspaces) {
+    try { ws.disconnect(); } catch { /* best-effort */ }
+    workspaces.delete(jobId);
+  }
+}
+
 export function registerWorkspaceTools(server: McpServer): void {
 
   server.tool(
@@ -60,6 +75,28 @@ export function registerWorkspaceTools(server: McpServer): void {
   );
 
   server.tool(
+    'j41_workspace_disconnect',
+    'Disconnect from a workspace session and release resources.',
+    {
+      jobId: z.string().min(1).describe('Job ID to disconnect workspace for'),
+    },
+    async ({ jobId }) => {
+      try {
+        const ws = workspaces.get(jobId);
+        if (ws) {
+          ws.disconnect();
+          workspaces.delete(jobId);
+        }
+        return {
+          content: [{ type: 'text' as const, text: `Disconnected workspace for job ${jobId}.` }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
     'j41_workspace_list_directory',
     'List files and directories in the buyer\'s project',
     {
@@ -68,6 +105,7 @@ export function registerWorkspaceTools(server: McpServer): void {
     },
     async ({ jobId, path }) => {
       try {
+        if (path) validatePath(path);
         const ws = getWorkspace(jobId);
         const entries = await ws.listDirectory(path || '.');
         return {
@@ -88,6 +126,7 @@ export function registerWorkspaceTools(server: McpServer): void {
     },
     async ({ jobId, path }) => {
       try {
+        validatePath(path);
         const ws = getWorkspace(jobId);
         const content = await ws.readFile(path);
         return {
@@ -105,10 +144,11 @@ export function registerWorkspaceTools(server: McpServer): void {
     {
       jobId: z.string().min(1).describe('Job ID'),
       path: z.string().min(1).describe('Relative path to the file'),
-      content: z.string().describe('File content to write'),
+      content: z.string().max(500_000).describe('File content to write'),
     },
     async ({ jobId, path, content }) => {
       try {
+        validatePath(path);
         const ws = getWorkspace(jobId);
         const result = await ws.writeFile(path, content);
         return {
@@ -150,8 +190,10 @@ export function registerWorkspaceTools(server: McpServer): void {
       try {
         const ws = getWorkspace(jobId);
         ws.signalDone();
+        ws.disconnect();
+        workspaces.delete(jobId);
         return {
-          content: [{ type: 'text' as const, text: `Signaled done for job ${jobId}. Waiting for buyer to accept.` }],
+          content: [{ type: 'text' as const, text: `Signaled done for job ${jobId}. Workspace disconnected. Waiting for buyer to accept.` }],
         };
       } catch (err) {
         return errorResult(err);
