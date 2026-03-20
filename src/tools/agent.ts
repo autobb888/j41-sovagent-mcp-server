@@ -89,28 +89,23 @@ export function registerAgentTools(server: McpServer): void {
 
   server.tool(
     'j41_register_agent',
-    'Register the agent profile on the J41 platform with full VDXF coverage (28 settable keys). Requires authentication.',
+    'Register the agent profile on the J41 platform with full VDXF coverage (18 keys across 8 groups). Requires authentication.',
     {
       name: z.string().min(1).max(100).describe('Agent display name'),
       type: z.enum(['autonomous', 'assisted', 'hybrid', 'tool']).describe('Agent type'),
       description: z.string().min(1).max(5000).describe('Agent description'),
-      category: z.string().min(1).max(100).optional().describe('Agent category (e.g. ai-assistant, automation)'),
       owner: z.string().min(1).max(200).optional().describe('Owner VerusID (e.g. myid@)'),
-      tags: z.array(z.string().min(1).max(50)).max(20).optional().describe('Tags (max 20)'),
-      website: z.string().url().optional().describe('Website URL'),
-      avatar: z.string().url().optional().describe('Avatar image URL'),
-      protocols: z.array(z.enum(['MCP', 'REST', 'A2A', 'WebSocket'])).optional().describe('Supported protocols'),
-      endpoints: z.array(z.object({
-        url: z.string().url(),
-        protocol: z.enum(['MCP', 'REST', 'A2A', 'WebSocket']),
-        public: z.boolean().optional(),
-        description: z.string().max(1000).optional(),
-      })).max(10).optional().describe('Service endpoints (max 10)'),
-      capabilities: z.array(z.object({
-        id: z.string().min(1).max(100),
-        name: z.string().min(1).max(100),
-        description: z.string().max(1000).optional(),
-      })).max(50).optional().describe('Agent capabilities (max 50)'),
+      network: z.object({
+        capabilities: z.array(z.string()).optional().describe('Agent capabilities'),
+        endpoints: z.array(z.string()).optional().describe('Service endpoint URLs'),
+        protocols: z.array(z.string()).optional().describe('Supported protocols (MCP, REST, A2A, WebSocket)'),
+      }).optional().describe('Network configuration (published as agent.network JSON blob)'),
+      profile: z.object({
+        tags: z.array(z.string().min(1).max(50)).max(20).optional().describe('Tags'),
+        website: z.string().url().optional().describe('Website URL'),
+        avatar: z.string().url().optional().describe('Avatar image URL'),
+        category: z.string().min(1).max(100).optional().describe('Category'),
+      }).optional().describe('Profile metadata (published as agent.profile JSON blob)'),
       session: z.object({
         duration: z.number().positive().optional().describe('Max session length in seconds'),
         tokenLimit: z.number().int().positive().optional().describe('Max LLM tokens per session'),
@@ -118,10 +113,17 @@ export function registerAgentTools(server: McpServer): void {
         messageLimit: z.number().int().positive().optional().describe('Max messages per session'),
         maxFileSize: z.number().int().positive().optional().describe('Max file size in bytes'),
         allowedFileTypes: z.array(z.string().min(1)).optional().describe('Allowed MIME types'),
-      }).optional().describe('Session resource limits (published on-chain via VDXF)'),
-      datapolicy: z.string().min(1).max(100).optional().describe('Data retention policy (ephemeral, session, persistent)'),
-      trustlevel: z.string().min(1).max(100).optional().describe('Trust level (verified, unverified, premium)'),
-      disputeresolution: z.string().min(1).max(100).optional().describe('Dispute resolution policy (platform, arbitration, mutual)'),
+      }).optional().describe('Session resource limits (published as session.params)'),
+      platformConfig: z.object({
+        datapolicy: z.string().optional().describe('Data retention policy (ephemeral, session, persistent)'),
+        trustlevel: z.string().optional().describe('Trust level (verified, unverified, premium)'),
+        disputeresolution: z.string().optional().describe('Dispute resolution policy (platform, arbitration, mutual)'),
+      }).optional().describe('Platform configuration (published as platform.config)'),
+      workspaceCapability: z.object({
+        workspace: z.boolean(),
+        modes: z.array(z.enum(['supervised', 'standard'])),
+        tools: z.array(z.string()),
+      }).optional().describe('Workspace capability declaration (published as workspace.capability)'),
     },
     async (args) => {
       try {

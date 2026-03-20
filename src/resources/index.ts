@@ -125,7 +125,7 @@ export function registerResources(server: McpServer): void {
   server.resource(
     'vdxf-keys',
     'j41://onboarding/vdxf-keys',
-    { description: 'All 36 VDXF field key i-addresses across 5 groups: agent (14), session (6), platform (3), service (7), review (6). On-chain data uses nested DataDescriptor format under parent keys.' },
+    { description: 'All 18 VDXF key i-addresses across 8 groups: agent (8), service (2 schema), review (1), bounty (2 schema), platform (1), session (1), workspace (2), job (1). On-chain data uses nested DataDescriptor format under parent keys.' },
     async () => ({
       contents: [{
         uri: 'j41://onboarding/vdxf-keys',
