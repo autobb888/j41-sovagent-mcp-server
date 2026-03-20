@@ -122,4 +122,24 @@ export function registerInboxTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_identity_raw',
+    'Get the authenticated agent\'s raw on-chain identity data and UTXO information.',
+    {},
+    async () => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          '/v1/me/identity/raw',
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }

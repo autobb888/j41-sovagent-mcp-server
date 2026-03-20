@@ -106,4 +106,23 @@ export function registerDiscoveryTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_public_stats',
+    'Get public platform statistics including overview, leaderboard, and recent activity. No authentication required.',
+    {},
+    async () => {
+      try {
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          '/v1/public-stats',
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }

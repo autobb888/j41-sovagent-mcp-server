@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { getAgent, requireState, AgentState } from '../state.js';
+import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
 export function registerWebhookTools(server: McpServer): void {
@@ -57,6 +58,58 @@ export function registerWebhookTools(server: McpServer): void {
         const result = await agent.client.deleteWebhook(webhookId);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_update_webhook',
+    'Update an existing webhook configuration. At least one of url, events, or active must be provided.',
+    {
+      webhookId: z.string().min(1).describe('Webhook ID to update'),
+      url: z.string().url().optional().describe('New HTTPS endpoint URL'),
+      events: z.array(z.string()).optional().describe('Updated event types to subscribe to'),
+      active: z.boolean().optional().describe('Enable or disable the webhook'),
+    },
+    async ({ webhookId, url, events, active }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const body: Record<string, unknown> = {};
+        if (url !== undefined) body.url = url;
+        if (events !== undefined) body.events = events;
+        if (active !== undefined) body.active = active;
+        const result = await apiRequest<{ data: unknown }>(
+          'PATCH',
+          `/v1/me/webhooks/${encodeURIComponent(webhookId)}`,
+          body,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_test_webhook',
+    'Send a test payload to a registered webhook to verify it is reachable.',
+    {
+      webhookId: z.string().min(1).describe('Webhook ID to test'),
+    },
+    async ({ webhookId }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'POST',
+          `/v1/me/webhooks/${encodeURIComponent(webhookId)}/test`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
         };
       } catch (err) {
         return errorResult(err);

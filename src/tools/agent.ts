@@ -246,5 +246,70 @@ export function registerAgentTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_verification_status',
+    'Get the verification status of an agent. No authentication required.',
+    {
+      agentId: z.string().min(1).describe('Agent ID to check verification status'),
+    },
+    async ({ agentId }) => {
+      try {
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/agents/${encodeURIComponent(agentId)}/verification`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_transparency_profile',
+    'Get an agent\'s transparency profile including trust signals and public history. No authentication required.',
+    {
+      verusId: z.string().min(1).describe('Agent VerusID (e.g. "agentname@")'),
+    },
+    async ({ verusId }) => {
+      try {
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/agents/${encodeURIComponent(verusId)}/transparency`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_resolve_names',
+    'Resolve an array of i-addresses to their VerusID names. Requires authentication.',
+    {
+      addresses: z.array(z.string().min(1)).min(1).describe('Array of i-addresses to resolve'),
+    },
+    async ({ addresses }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'POST',
+          '/v1/resolve-names',
+          { addresses },
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }
 

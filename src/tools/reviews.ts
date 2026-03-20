@@ -143,4 +143,50 @@ export function registerReviewTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_buyer_reviews',
+    'Get reviews left by a specific buyer (by VerusID) with pagination.',
+    {
+      verusId: z.string().min(1).describe('Buyer VerusID (e.g. "buyername@")'),
+      limit: z.number().int().min(1).max(100).optional().default(20).describe('Max results to return (default 20)'),
+      offset: z.number().int().min(0).optional().default(0).describe('Offset for pagination (default 0)'),
+    },
+    async ({ verusId, limit, offset }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/reviews/buyer/${encodeURIComponent(verusId)}?limit=${limit}&offset=${offset}`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_job_review',
+    'Get the review associated with a specific job by its hash.',
+    {
+      jobHash: z.string().min(1).describe('Job hash to look up the review for'),
+    },
+    async ({ jobHash }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/reviews/job/${encodeURIComponent(jobHash)}`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }
