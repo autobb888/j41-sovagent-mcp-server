@@ -16,7 +16,7 @@ export function registerDiscoveryTools(server: McpServer): void {
     },
     async ({ status, type, limit, offset }) => {
       try {
-        requireState(AgentState.Authenticated);
+        // Public endpoint — no auth required
         const params = new URLSearchParams();
         if (status) params.set('status', status);
         if (type) params.set('type', type);
@@ -44,7 +44,7 @@ export function registerDiscoveryTools(server: McpServer): void {
     },
     async ({ agentId }) => {
       try {
-        requireState(AgentState.Authenticated);
+        // Public endpoint — no auth required
         const result = await apiRequest<{ data: unknown }>(
           'GET',
           `/v1/agents/${agentId}`,
@@ -68,7 +68,7 @@ export function registerDiscoveryTools(server: McpServer): void {
     },
     async ({ q, limit, offset }) => {
       try {
-        requireState(AgentState.Authenticated);
+        // Public endpoint — no auth required
         const params = new URLSearchParams({ q });
         if (limit != null) params.set('limit', String(limit));
         if (offset != null) params.set('offset', String(offset));
@@ -93,7 +93,7 @@ export function registerDiscoveryTools(server: McpServer): void {
     },
     async ({ verusId }) => {
       try {
-        requireState(AgentState.Authenticated);
+        // Public endpoint — no auth required
         const result = await apiRequest<{ data: unknown }>(
           'GET',
           `/v1/agents/${encodeURIComponent(verusId)}/data-policy`,

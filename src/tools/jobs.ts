@@ -62,7 +62,7 @@ export function registerJobTools(server: McpServer): void {
         // Fetch job details to build proper signing message
         const jobDetails = await agent.client.getJob(jobId);
         const timestamp = Math.floor(Date.now() / 1000);
-        const message = `J41-ACCEPT|Job:${jobDetails.jobHash}|Ts:${timestamp}|I accept this job and commit to delivering.`;
+        const message = `J41-ACCEPT|Job:${jobDetails.jobHash}|Buyer:${jobDetails.buyerVerusId}|Amt:${jobDetails.amount} ${jobDetails.currency}|Ts:${timestamp}|I accept this job and commit to delivering the work.`;
         const signature = signWithAgent(message);
         const job = await agent.client.acceptJob(jobId, signature, timestamp);
         return {
@@ -91,7 +91,7 @@ export function registerJobTools(server: McpServer): void {
         const timestamp = Math.floor(Date.now() / 1000);
         const { createHash } = await import('crypto');
         const deliveryHash = createHash('sha256').update(deliveryContent).digest('hex');
-        const message = `J41-DELIVER|Job:${jobDetails.jobHash}|Hash:${deliveryHash}|Ts:${timestamp}|I have delivered the work as described.`;
+        const message = `J41-DELIVER|Job:${jobDetails.jobHash}|Delivery:${deliveryHash}|Ts:${timestamp}|I have delivered the work for this job.`;
         const signature = signWithAgent(message);
         const job = await agent.client.deliverJob(jobId, deliveryContent, signature, timestamp, deliveryMessage);
         return {
@@ -151,21 +151,29 @@ export function registerJobTools(server: McpServer): void {
     {
       sellerVerusId: z.string().min(1).describe('VerusID of the agent to hire'),
       serviceId: z.string().min(1).optional().describe('Service ID to request'),
-      description: z.string().min(1).max(5000).describe('Job description'),
+      description: z.string().min(1).max(2000).describe('Job description'),
       amount: z.number().positive().describe('Payment amount'),
-      currency: z.string().min(1).max(10).default('VRSC').describe('Currency (default: VRSC)'),
+      currency: z.string().min(1).max(10).default('VRSCTEST').describe('Currency'),
       deadline: z.string().optional().describe('Deadline as ISO date string'),
+      paymentTerms: z.enum(['prepay', 'postpay', 'split']).default('prepay').describe('Payment terms'),
+      sovguardEnabled: z.boolean().default(true).describe('Enable SovGuard protection'),
     },
-    async ({ sellerVerusId, serviceId, description, amount, currency, deadline }) => {
+    async ({ sellerVerusId, serviceId, description, amount, currency, deadline, paymentTerms, sovguardEnabled }) => {
       try {
         requireState(AgentState.Authenticated);
         const timestamp = Math.floor(Date.now() / 1000);
-        const message = `J41-JOB|To:${sellerVerusId}|Desc:${description}|Amt:${amount} ${currency}|Deadline:${deadline}|Ts:${timestamp}|I request this job and agree to pay upon completion.`;
+        const fee = amount * 0.05;
+        const paymentCommitment = paymentTerms === 'prepay'
+          ? 'I request this job and agree to pay upfront before work begins.'
+          : paymentTerms === 'postpay'
+            ? 'I request this job and agree to pay upon delivery.'
+            : 'I request this job and agree to split payment (50% upfront, 50% on delivery).';
+        const message = `J41-JOB|To:${sellerVerusId}|Desc:${description}|Amt:${Number(amount).toFixed(4)} ${currency}|Fee:${fee.toFixed(4)} ${currency}|Pay:${paymentTerms}|SovGuard:${sovguardEnabled ? 'yes' : 'no'}|Retain:none|Train:no|3rdParty:no|DelAttest:yes|Deadline:${deadline || 'None'}|Ts:${timestamp}|${paymentCommitment}`;
         const signature = signWithAgent(message);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
           '/v1/jobs',
-          { sellerVerusId, serviceId, description, amount, currency, deadline, timestamp, signature },
+          { sellerVerusId, serviceId, description, amount, currency, deadline, paymentTerms, sovguardEnabled, timestamp, signature, fee },
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],

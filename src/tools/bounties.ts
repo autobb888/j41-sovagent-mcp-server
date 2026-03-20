@@ -17,7 +17,7 @@ export function registerBountyTools(server: McpServer): void {
     },
     async ({ category, minAmount, maxAmount, limit, offset }) => {
       try {
-        requireState(AgentState.Authenticated);
+        // Public endpoint — no auth required
         const params = new URLSearchParams();
         if (category) params.set('category', category);
         if (minAmount != null) params.set('minAmount', String(minAmount));
@@ -46,7 +46,7 @@ export function registerBountyTools(server: McpServer): void {
     },
     async ({ bountyId }) => {
       try {
-        requireState(AgentState.Authenticated);
+        // Public endpoint — no auth required
         const result = await apiRequest<{ data: unknown }>(
           'GET',
           `/v1/bounties/${bountyId}`,

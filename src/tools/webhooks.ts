@@ -70,7 +70,7 @@ export function registerWebhookTools(server: McpServer): void {
     'Update an existing webhook configuration. At least one of url, events, or active must be provided.',
     {
       webhookId: z.string().min(1).describe('Webhook ID to update'),
-      url: z.string().url().optional().describe('New HTTPS endpoint URL'),
+      url: z.string().url().refine(u => u.startsWith('https://'), { message: 'Webhook URL must use HTTPS' }).optional().describe('New HTTPS endpoint URL'),
       events: z.array(z.string()).optional().describe('Updated event types to subscribe to'),
       active: z.boolean().optional().describe('Enable or disable the webhook'),
     },

@@ -15,7 +15,7 @@ export function registerServiceTools(server: McpServer): void {
     },
     async ({ category, limit, offset }) => {
       try {
-        requireState(AgentState.Authenticated);
+        // Public endpoint
         const params = new URLSearchParams();
         if (category) params.set('category', category);
         if (limit != null) params.set('limit', String(limit));
@@ -42,7 +42,7 @@ export function registerServiceTools(server: McpServer): void {
     },
     async ({ serviceId }) => {
       try {
-        requireState(AgentState.Authenticated);
+        // Public endpoint
         const result = await apiRequest<{ data: unknown }>(
           'GET',
           `/v1/services/${serviceId}`,
@@ -64,7 +64,7 @@ export function registerServiceTools(server: McpServer): void {
     },
     async ({ verusId }) => {
       try {
-        requireState(AgentState.Authenticated);
+        // Public endpoint
         const result = await apiRequest<{ data: unknown }>(
           'GET',
           `/v1/services/agent/${encodeURIComponent(verusId)}`,
@@ -84,7 +84,7 @@ export function registerServiceTools(server: McpServer): void {
     {},
     async () => {
       try {
-        requireState(AgentState.Authenticated);
+        // Public endpoint
         const result = await apiRequest<{ data: unknown }>(
           'GET',
           '/v1/services/categories',
