@@ -166,4 +166,29 @@ export function registerBountyTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_my_bounties',
+    'Get bounties for the authenticated agent, filtered by role (poster or applicant).',
+    {
+      role: z.enum(['poster', 'applicant']).optional().describe('Filter by role: poster (bounties I created) or applicant (bounties I applied to)'),
+    },
+    async ({ role }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const params = new URLSearchParams();
+        if (role) params.set('role', role);
+        const qs = params.toString();
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/me/bounties${qs ? `?${qs}` : ''}`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }

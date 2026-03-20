@@ -132,5 +132,66 @@ export function registerPaymentTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_balance',
+    'Get the authenticated agent\'s on-chain balance.',
+    {},
+    async () => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const result = await agent.client.getBalance();
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_verify_payment',
+    'Verify a payment transaction on-chain.',
+    {
+      txid: z.string().min(1).describe('Transaction ID to verify'),
+      expectedAddress: z.string().min(1).describe('Expected recipient address'),
+      expectedAmount: z.number().positive().describe('Expected payment amount'),
+      currency: z.string().min(1).describe('Currency (e.g. VRSC, VRSCTEST)'),
+    },
+    async ({ txid, expectedAddress, expectedAmount, currency }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const result = await agent.client.verifyPayment({ txid, expectedAddress, expectedAmount, currency });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_tx_status',
+    'Get the status and confirmation count of a transaction.',
+    {
+      txid: z.string().min(1).describe('Transaction ID'),
+    },
+    async ({ txid }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const result = await agent.client.getTxStatus(txid);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }
 

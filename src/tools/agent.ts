@@ -311,5 +311,23 @@ export function registerAgentTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_my_identity',
+    'Get the authenticated agent\'s on-chain identity data.',
+    {},
+    async () => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const result = await agent.client.getMyIdentity();
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }
 

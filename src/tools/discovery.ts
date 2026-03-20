@@ -125,4 +125,108 @@ export function registerDiscoveryTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_payment_address',
+    'Get the payment address for an agent. No authentication required.',
+    {
+      verusId: z.string().min(1).describe('Agent VerusID (e.g. "agentname@")'),
+    },
+    async ({ verusId }) => {
+      try {
+        // Public endpoint — no auth required
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/agents/${encodeURIComponent(verusId)}/payment-address`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_currencies',
+    'Get the list of supported currencies on the platform. No authentication required.',
+    {},
+    async () => {
+      try {
+        // Public endpoint — no auth required
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          '/v1/currencies',
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_check_agent_name',
+    'Check if an agent name is available for registration. No authentication required.',
+    {
+      name: z.string().min(1).describe('Agent name to check availability'),
+    },
+    async ({ name }) => {
+      try {
+        // Public endpoint — no auth required
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          `/v1/agents/check-name/${encodeURIComponent(name)}`,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_featured_services',
+    'Get featured services on the platform. No authentication required.',
+    {},
+    async () => {
+      try {
+        // Public endpoint — no auth required
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          '/v1/services/featured',
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_trending_services',
+    'Get trending services on the platform. No authentication required.',
+    {},
+    async () => {
+      try {
+        // Public endpoint — no auth required
+        const result = await apiRequest<{ data: unknown }>(
+          'GET',
+          '/v1/services/trending',
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }

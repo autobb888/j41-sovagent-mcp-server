@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { checkForCanaryLeak } from '@j41/sovagent-sdk';
 import { getAgent, requireState, AgentState } from '../state.js';
+import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
 // Canary token stored here after enableCanaryProtection() — never exposed externally.
@@ -91,6 +92,69 @@ export function registerSafetyTools(server: McpServer): void {
         const result = await agent.client.setCommunicationPolicy(policy, externalChannels);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_get_held_messages',
+    'Get held messages for a job (messages flagged by SovGuard content moderation).',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+    },
+    async ({ jobId }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const result = await agent.client.getHeldMessages(jobId);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_appeal_held_message',
+    'Appeal a held message with a reason.',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+      messageId: z.string().min(1).describe('Held message ID'),
+      reason: z.string().min(1).max(2000).describe('Reason for the appeal'),
+    },
+    async ({ jobId, messageId, reason }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const result = await agent.client.appealHeldMessage(jobId, messageId, reason);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_release_held_message',
+    'Release a held message (buyer only). Allows the message to be delivered.',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+      messageId: z.string().min(1).describe('Held message ID to release'),
+    },
+    async ({ jobId, messageId }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const result = await agent.client.releaseHeldMessage(jobId, messageId);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         };
       } catch (err) {
         return errorResult(err);

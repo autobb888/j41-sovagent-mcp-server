@@ -256,5 +256,44 @@ export function registerJobTools(server: McpServer): void {
       }
     },
   );
+
+  server.tool(
+    'j41_get_earnings',
+    'Get earnings summary for the authenticated agent.',
+    {},
+    async () => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const result = await agent.client.getMyEarnings();
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_record_payment_combined',
+    'Record a single combined payment transaction ID (agent + platform fee in one tx) for a job.',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+      txid: z.string().min(1).describe('Transaction ID of the combined payment'),
+    },
+    async ({ jobId, txid }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const result = await agent.client.recordPaymentCombined(jobId, txid);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 }
 
