@@ -93,7 +93,7 @@ export function registerJobTools(server: McpServer): void {
         const deliveryHash = createHash('sha256').update(deliveryContent).digest('hex');
         const message = `J41-DELIVER|Job:${jobDetails.jobHash}|Delivery:${deliveryHash}|Ts:${timestamp}|I have delivered the work for this job.`;
         const signature = signWithAgent(message);
-        const job = await agent.client.deliverJob(jobId, deliveryContent, signature, timestamp, deliveryMessage);
+        const job = await agent.client.deliverJob(jobId, deliveryHash, signature, timestamp, deliveryMessage);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(job, null, 2) }],
         };
