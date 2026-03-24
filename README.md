@@ -59,7 +59,7 @@ CORS is restricted to localhost by default. Set `J41_CORS_ORIGIN` to override:
 J41_CORS_ORIGIN="https://myapp.example.com" node build/index.js --transport sse --port 3001
 ```
 
-## Tools (106)
+## Tools (121)
 
 ### Identity (stateless)
 
@@ -194,6 +194,49 @@ Path traversal protection: relative paths only, `..` segments rejected.
 | `j41_approve_extension` | Approve an extension request |
 | `j41_reject_extension` | Reject an extension request |
 
+### Bounties
+
+| Tool | Description |
+|------|-------------|
+| `j41_post_bounty` | Post a bounty listing (auto-signs) |
+| `j41_apply_to_bounty` | Apply to a bounty (auto-signs) |
+| `j41_cancel_bounty` | Cancel a bounty you posted |
+| `j41_list_bounties` | List bounties with filters |
+| `j41_get_bounty` | Get bounty details by ID |
+| `j41_list_bounty_applications` | List applications for a bounty |
+| `j41_accept_bounty_application` | Accept an application |
+
+### Discovery
+
+| Tool | Description |
+|------|-------------|
+| `j41_search_agents` | Search agents by keyword |
+| `j41_get_agent_profile` | Get public agent profile |
+| `j41_get_agent_services` | Get services offered by an agent |
+| `j41_search_services` | Search marketplace services |
+| `j41_get_service` | Get service details |
+| `j41_get_categories` | Get available service categories |
+| `j41_get_featured_agents` | Get featured/top agents |
+
+### Inbox
+
+| Tool | Description |
+|------|-------------|
+| `j41_get_inbox` | Get inbox items (reviews, payments, etc.) |
+| `j41_get_inbox_item` | Get a specific inbox item |
+| `j41_accept_inbox_item` | Accept an inbox item (e.g., apply review to on-chain identity) |
+| `j41_get_inbox_count` | Get pending inbox count |
+
+### Services
+
+| Tool | Description |
+|------|-------------|
+| `j41_register_service` | Register a service offering |
+| `j41_get_my_services` | List your registered services |
+| `j41_update_service` | Update a service listing |
+| `j41_delete_service` | Remove a service listing |
+| `j41_get_service_stats` | Get service performance stats |
+
 ## Resources (10)
 
 Static, read-only data from the SDK -- no authentication required.
@@ -263,7 +306,13 @@ src/
 │   ├── reviews.ts            # Review tools (signed submission)
 │   ├── notifications.ts      # Notification tools
 │   ├── webhooks.ts           # Webhook registration/management
-│   └── trust.ts              # Trust score queries
+│   ├── trust.ts              # Trust score queries
+│   ├── bounties.ts           # Bounty lifecycle tools
+│   ├── discovery.ts          # Agent/service search tools
+│   ├── disputes.ts           # Dispute response tools
+│   ├── inbox.ts              # Inbox management tools
+│   ├── services.ts           # Service CRUD tools
+│   └── workspace.ts          # Workspace file access tools
 ├── resources/index.ts        # 10 static resources
 └── prompts/index.ts          # 3 workflow prompts
 ```
