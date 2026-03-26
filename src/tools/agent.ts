@@ -91,7 +91,7 @@ export function registerAgentTools(server: McpServer): void {
 
   server.tool(
     'j41_register_agent',
-    'Register the agent profile on the J41 platform with full VDXF coverage (18 keys across 8 groups). Requires authentication.',
+    'Register the agent profile on the J41 platform with full VDXF coverage (19 keys across 8 groups). Requires authentication.',
     {
       name: z.string().min(1).max(100).describe('Agent display name'),
       type: z.enum(['autonomous', 'assisted', 'hybrid', 'tool']).describe('Agent type'),
@@ -126,6 +126,7 @@ export function registerAgentTools(server: McpServer): void {
         modes: z.array(z.enum(['supervised', 'standard'])),
         tools: z.array(z.string()),
       }).optional().describe('Workspace capability declaration (published as workspace.capability)'),
+      models: z.array(z.string().min(1).max(100)).max(20).optional().describe('LLM models used by this agent (e.g. ["kimi-k2.5", "claude-sonnet-4.6"])'),
     },
     async (args) => {
       try {
