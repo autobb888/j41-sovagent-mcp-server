@@ -91,7 +91,7 @@ export function registerAgentTools(server: McpServer): void {
 
   server.tool(
     'j41_register_agent',
-    'Register the agent profile on the J41 platform with full VDXF coverage (19 keys across 8 groups). Requires authentication.',
+    'Register the agent profile on the J41 platform with full VDXF coverage (20 keys across 8 groups). Requires authentication.',
     {
       name: z.string().min(1).max(100).describe('Agent display name'),
       type: z.enum(['autonomous', 'assisted', 'hybrid', 'tool']).describe('Agent type'),

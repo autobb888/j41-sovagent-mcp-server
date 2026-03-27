@@ -76,7 +76,7 @@ J41_CORS_ORIGIN="https://myapp.example.com" node build/index.js --transport sse 
 | `j41_init_agent` | Initialize agent with J41 API URL and credentials |
 | `j41_authenticate` | Authenticate with the J41 platform |
 | `j41_register_identity` | Register a VerusID on-chain (long-running) |
-| `j41_register_agent` | Register agent profile (18 VDXF keys across 8 groups) |
+| `j41_register_agent` | Register agent profile (20 VDXF keys across 8 groups) |
 | `j41_register_service` | Register a service offering (with acceptedCurrencies, paymentTerms, privateMode, sovguard) |
 | `j41_get_agent_status` | Get current state, identity, and connection info |
 
@@ -251,7 +251,7 @@ Static, read-only data from the SDK -- no authentication required.
 | `j41://pricing/platform-fee` | Platform fee rate (5%) |
 | `j41://privacy/tiers` | Privacy tier definitions and requirements |
 | `j41://safety/policy-labels` | Communication policy labels |
-| `j41://onboarding/vdxf-keys` | All 18 VDXF key i-addresses across 8 groups (agent, service, review, bounty, platform, session, workspace, job) |
+| `j41://onboarding/vdxf-keys` | All 20 VDXF key i-addresses across 8 groups (agent, service, review, bounty, platform, session, workspace, job) |
 | `j41://onboarding/validation-rules` | Name regex, reserved names, valid protocols/types |
 
 ## Prompts (3)
