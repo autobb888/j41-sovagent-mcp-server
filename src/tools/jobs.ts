@@ -1,8 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { getAgent, requireState, signWithAgent, AgentState } from '../state.js';
+import { getAgent, requireState, signWithAgent, AgentState, getAllowlist, getRateLimiter, reloadAllowlist } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
+import { checkFinancialOp, logBlockedOperation, addActiveJobAddress, removeActiveJobAddress, getAllowlistPath } from '../allowlist.js';
 
 const JOB_STATUS = z.enum([
   'requested', 'accepted', 'in_progress', 'delivered',
@@ -65,6 +66,18 @@ export function registerJobTools(server: McpServer): void {
         const message = `J41-ACCEPT|Job:${jobDetails.jobHash}|Buyer:${jobDetails.buyerVerusId}|Amt:${jobDetails.amount} ${jobDetails.currency}|Ts:${timestamp}|I accept this job and commit to delivering the work.`;
         const signature = signWithAgent(message);
         const job = await agent.client.acceptJob(jobId, signature, timestamp);
+
+        // ── Allowlist lifecycle: add buyer refund address ──
+        const buyerAddress = jobDetails.buyerPayAddress || jobDetails.buyer?.payAddress;
+        if (buyerAddress) {
+          addActiveJobAddress(getAllowlistPath(), jobId, buyerAddress);
+          reloadAllowlist();
+          console.error(`[allowlist] Added buyer address ${buyerAddress} for job ${jobId}`);
+        }
+
+        // ── Mandatory canary: auto-enable on job accept ──
+        import('../safety.js').then(m => m.ensureCanaryEnabled()).catch(() => {});
+
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(job, null, 2) }],
         };
@@ -118,6 +131,13 @@ export function registerJobTools(server: McpServer): void {
         const message = `J41-COMPLETE|Job:${jobHash}|Ts:${timestamp}|I confirm the work has been delivered satisfactorily.`;
         const signature = signWithAgent(message);
         const job = await agent.client.completeJob(jobId, signature, timestamp);
+
+        // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
+        removeActiveJobAddress(getAllowlistPath(), jobId);
+        getRateLimiter().clearJob(jobId);
+        reloadAllowlist();
+        console.error(`[allowlist] Removed buyer address for completed job ${jobId}`);
+
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(job, null, 2) }],
         };
@@ -136,6 +156,13 @@ export function registerJobTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
         const job = await agent.client.cancelJob(jobId);
+
+        // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
+        removeActiveJobAddress(getAllowlistPath(), jobId);
+        getRateLimiter().clearJob(jobId);
+        reloadAllowlist();
+        console.error(`[allowlist] Removed buyer address for cancelled job ${jobId}`);
+
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(job, null, 2) }],
         };
@@ -197,6 +224,13 @@ export function registerJobTools(server: McpServer): void {
           'POST',
           `/v1/jobs/${jobId}/end-session`,
         );
+
+        // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
+        removeActiveJobAddress(getAllowlistPath(), jobId);
+        getRateLimiter().clearJob(jobId);
+        reloadAllowlist();
+        console.error(`[allowlist] Removed buyer address for ended session ${jobId}`);
+
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         };
@@ -289,6 +323,76 @@ export function registerJobTools(server: McpServer): void {
         const result = await agent.client.recordPaymentCombined(jobId, txid);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_record_platform_fee',
+    'Record a platform fee transaction ID for a job (separate from agent payment).',
+    {
+      jobId: z.string().min(1).describe('Job ID'),
+      txid: z.string().min(1).describe('Transaction ID of the platform fee payment'),
+    },
+    async ({ jobId, txid }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const result = await agent.client.recordPlatformFee(jobId, txid);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_send_multi_payment',
+    'Send VRSC/VRSCTEST to multiple addresses in a single transaction (e.g. agent payment + platform fee). Builds, signs, and broadcasts.',
+    {
+      outputs: z.array(z.object({
+        address: z.string().min(1).describe('Destination R-address, i-address, or VerusID'),
+        amount: z.number().positive().describe('Amount in VRSC'),
+      })).min(1).max(10).describe('Array of {address, amount} outputs'),
+    },
+    async ({ outputs }) => {
+      try {
+        requireState(AgentState.Authenticated);
+
+        // ── Allowlist gate: check EVERY output address ──
+        const allowlist = getAllowlist();
+        const limiter = getRateLimiter();
+        const total = outputs.reduce((s: number, o: { amount: number }) => s + o.amount, 0);
+        const jobId = '_standalone';
+        const jobPrice = 0;
+
+        for (const output of outputs) {
+          const gate = checkFinancialOp(output.address, output.amount, jobId, jobPrice, allowlist, limiter);
+          if (!gate.allowed) {
+            logBlockedOperation('j41_send_multi_payment', output.address, output.amount, jobId, gate.reason!);
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify({
+                error: `Output to ${output.address} blocked: ${gate.reason}`,
+                code: 'FINANCIAL_OP_BLOCKED',
+              }) }],
+              isError: true,
+            };
+          }
+        }
+
+        const agent = getAgent();
+        const txid = await agent.sendMultiPayment(outputs);
+
+        // Record the full send
+        limiter.recordSend(jobId, total);
+
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ txid, outputs, totalAmount: total }, null, 2) }],
         };
       } catch (err) {
         return errorResult(err);

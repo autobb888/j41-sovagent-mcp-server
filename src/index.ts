@@ -56,6 +56,12 @@ registerDiscoveryTools(server);
 registerResources(server);
 registerPrompts(server);
 
+// ── Start financial allowlist sweep timer ──
+import { startSweepTimer, stopSweepTimer } from './allowlist.js';
+import { getRateLimiter } from './state.js';
+import { apiRequest } from './tools/api-request.js';
+startSweepTimer(apiRequest, getRateLimiter());
+
 // Parse CLI arguments
 const args = process.argv.slice(2);
 const transportArg = args.indexOf('--transport');
@@ -75,14 +81,16 @@ async function main(): Promise<void> {
   }
 }
 
-// Graceful shutdown — disconnect all workspace connections
+// Graceful shutdown — disconnect all workspace connections, stop sweep timer
 process.on('SIGTERM', () => {
-  console.error('Received SIGTERM — disconnecting workspaces');
+  console.error('Received SIGTERM — disconnecting workspaces, stopping sweep');
+  stopSweepTimer();
   disconnectAllWorkspaces();
   process.exit(0);
 });
 process.on('SIGINT', () => {
-  console.error('Received SIGINT — disconnecting workspaces');
+  console.error('Received SIGINT — disconnecting workspaces, stopping sweep');
+  stopSweepTimer();
   disconnectAllWorkspaces();
   process.exit(0);
 });

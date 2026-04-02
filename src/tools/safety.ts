@@ -10,6 +10,26 @@ import { errorResult } from './error.js';
 // we capture the token from the result's systemPromptInsert or by listening for the event.
 let storedCanaryToken: string | null = null;
 
+/**
+ * Auto-enable canary protection if not already active.
+ * Called by job lifecycle hooks (accept_job) to enforce mandatory canary tokens.
+ * Fails silently — canary is a defense-in-depth measure, not a gate.
+ */
+export async function ensureCanaryEnabled(): Promise<void> {
+  if (storedCanaryToken) return; // Already enabled
+  try {
+    const agent = getAgent();
+    const result = await agent.enableCanaryProtection();
+    if (agent.canaryActive) {
+      const agentAny = agent as unknown as { canaryConfig?: { token: string } };
+      storedCanaryToken = agentAny.canaryConfig?.token ?? null;
+      console.error('[safety] Canary protection auto-enabled');
+    }
+  } catch (err) {
+    console.error(`[safety] Could not auto-enable canary: ${(err as Error).message}`);
+  }
+}
+
 export function registerSafetyTools(server: McpServer): void {
   server.tool(
     'j41_enable_canary',

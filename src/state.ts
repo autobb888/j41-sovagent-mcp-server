@@ -5,6 +5,7 @@ import {
   signMessage,
   J41Error,
 } from '@j41/sovagent-sdk';
+import { RateLimiter, loadAllowlist, getAllowlistPath, type FinancialAllowlist } from './allowlist.js';
 
 export enum AgentState {
   Uninitialized = 'uninitialized',
@@ -30,6 +31,40 @@ let identityInfo: IdentityInfo | null = null;
 let storedWif: string | null = null;
 let storedNetwork: 'verus' | 'verustest' = 'verustest';
 
+// Pending keypair from generate_keypair — used by register_identity
+let pendingKeypair: { wif: string; pubkey: string; address: string; network: 'verus' | 'verustest' } | null = null;
+
+// ── Financial allowlist state (singleton) ──
+let cachedAllowlist: FinancialAllowlist | null = null;
+const rateLimiter = new RateLimiter();
+
+export function setPendingKeypair(kp: { wif: string; pubkey: string; address: string; network: 'verus' | 'verustest' }): void {
+  pendingKeypair = kp;
+}
+
+export function getPendingKeypair(): typeof pendingKeypair {
+  return pendingKeypair;
+}
+
+export function clearPendingKeypair(): void {
+  pendingKeypair = null;
+}
+
+/**
+ * Reset agent state completely — allows switching to a different agent.
+ */
+export function resetAgent(): void {
+  if (agent) {
+    try { (agent as any).chatClient?.disconnect(); } catch {}
+  }
+  agent = null;
+  state = AgentState.Uninitialized;
+  identityInfo = null;
+  storedWif = null;
+  pendingKeypair = null;
+  cachedAllowlist = null;
+}
+
 export function initAgent(config: {
   apiUrl: string;
   wif: string;
@@ -37,8 +72,9 @@ export function initAgent(config: {
   iAddress?: string;
   network?: 'verus' | 'verustest';
 }): IdentityInfo {
+  // Allow re-initialization — clean up old agent first
   if (agent) {
-    throw new J41Error('Agent already initialized — restart to reinitialize', 'ALREADY_INITIALIZED', 400);
+    resetAgent();
   }
 
   const network = config.network ?? 'verustest';
@@ -117,6 +153,33 @@ export function signWithAgent(message: string): string {
 
 export function getNetwork(): 'verus' | 'verustest' {
   return storedNetwork;
+}
+
+// ── Allowlist accessors ──
+
+/**
+ * Get the cached financial allowlist. Loads from disk on first call.
+ * Call reloadAllowlist() to refresh after lifecycle events.
+ */
+export function getAllowlist(): FinancialAllowlist {
+  if (!cachedAllowlist) {
+    cachedAllowlist = loadAllowlist();
+  }
+  return cachedAllowlist;
+}
+
+/**
+ * Force reload the allowlist from disk (after add/remove operations).
+ */
+export function reloadAllowlist(): void {
+  cachedAllowlist = loadAllowlist();
+}
+
+/**
+ * Get the shared rate limiter instance.
+ */
+export function getRateLimiter(): RateLimiter {
+  return rateLimiter;
 }
 
 export function requireState(minState: AgentState): void {

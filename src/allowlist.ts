@@ -346,3 +346,113 @@ export function logBlockedOperation(
   };
   console.error(`[allowlist] ${JSON.stringify(entry)}`);
 }
+
+// ── Sweep Timer ──
+
+const SWEEP_INTERVAL_MS = 10 * 60 * 1000;  // 10 minutes
+const SWEEP_RETRY_MS = 2 * 60 * 1000;      // 2 minutes on API failure
+const SUSPEND_AFTER_MS = 30 * 60 * 1000;   // 30 minutes of API outage → global suspend
+
+let sweepTimer: ReturnType<typeof setInterval> | null = null;
+let apiOutageSince: number | null = null;
+
+/**
+ * Sweep all active_jobs entries against the platform API.
+ * Removes addresses for jobs that are no longer active.
+ * FAIL-CLOSED: if API unreachable, freeze active_jobs sends.
+ * After 30 minutes of outage, suspend ALL financial operations.
+ *
+ * @param apiRequestFn - The apiRequest function (injected to avoid circular imports)
+ * @param rateLimiter - The shared rate limiter
+ */
+export async function sweepActiveJobs(
+  apiRequestFn: <T>(method: string, path: string) => Promise<T>,
+  rateLimiter: RateLimiter,
+): Promise<void> {
+  const filePath = getAllowlistPath();
+  const list = loadAllowlist(filePath);
+
+  if (list.active_jobs.length === 0) {
+    // Nothing to sweep — clear any outage state
+    if (apiOutageSince) {
+      apiOutageSince = null;
+      rateLimiter.resume();
+    }
+    return;
+  }
+
+  let apiReachable = false;
+
+  for (const entry of [...list.active_jobs]) {
+    try {
+      const job = await apiRequestFn<{ data: { status: string } }>('GET', `/v1/jobs/${entry.jobId}`);
+      apiReachable = true;
+
+      const activeStatuses = ['requested', 'accepted', 'in_progress', 'delivered', 'rework'];
+      if (!activeStatuses.includes(job.data.status)) {
+        // Job is no longer active — remove address
+        removeActiveJobAddress(filePath, entry.jobId);
+        rateLimiter.clearJob(entry.jobId);
+        console.error(`[allowlist-sweep] Removed stale job ${entry.jobId} (status: ${job.data.status})`);
+      }
+    } catch (err) {
+      console.error(`[allowlist-sweep] API check failed for job ${entry.jobId}: ${(err as Error).message}`);
+      // Don't remove — fail-closed means we keep the entry but freeze sends
+    }
+  }
+
+  if (apiReachable) {
+    // API is back — clear outage
+    if (apiOutageSince) {
+      console.error('[allowlist-sweep] API connectivity restored — resuming financial operations');
+      apiOutageSince = null;
+      rateLimiter.resume();
+    }
+  } else {
+    // API unreachable for all entries
+    const now = Date.now();
+    if (!apiOutageSince) {
+      apiOutageSince = now;
+      console.error('[allowlist-sweep] API unreachable — active_jobs sends frozen');
+    }
+
+    // After 30 minutes, suspend ALL financial operations
+    if (now - apiOutageSince >= SUSPEND_AFTER_MS) {
+      if (!rateLimiter.isSuspended()) {
+        rateLimiter.suspend('Platform API unreachable for >30 minutes');
+        console.error('[allowlist-sweep] API outage >30min — ALL financial operations suspended');
+      }
+    }
+  }
+}
+
+/**
+ * Start the sweep timer. Call once at MCP server boot.
+ */
+export function startSweepTimer(
+  apiRequestFn: <T>(method: string, path: string) => Promise<T>,
+  rateLimiter: RateLimiter,
+): void {
+  if (sweepTimer) return; // Already running
+
+  sweepTimer = setInterval(() => {
+    sweepActiveJobs(apiRequestFn, rateLimiter).catch((err) => {
+      console.error(`[allowlist-sweep] Unhandled error: ${(err as Error).message}`);
+    });
+  }, SWEEP_INTERVAL_MS);
+
+  // Don't prevent process exit
+  if (sweepTimer.unref) sweepTimer.unref();
+
+  console.error(`[allowlist] Sweep timer started (every ${SWEEP_INTERVAL_MS / 60_000} min)`);
+}
+
+/**
+ * Stop the sweep timer (for graceful shutdown).
+ */
+export function stopSweepTimer(): void {
+  if (sweepTimer) {
+    clearInterval(sweepTimer);
+    sweepTimer = null;
+  }
+}
