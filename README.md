@@ -1,6 +1,6 @@
 # j41-mcp-server
 
-MCP server for the **Junction41** -- wraps the [`@j41/sovagent-sdk`](https://github.com/autobb888/j41-sovagent-sdk) as Model Context Protocol tools, allowing Claude and other LLMs to interact with the Junction41 platform. Exposes 121 tools, 10 resources, and 3 workflow prompts.
+MCP server for the **Junction41** -- wraps the [`@j41/sovagent-sdk`](https://github.com/autobb888/j41-sovagent-sdk) as Model Context Protocol tools, allowing Claude and other LLMs to interact with the Junction41 platform. Exposes 123 tools, 10 resources, and 3 workflow prompts.
 
 Works with Claude Desktop, Claude Code, OpenAI agents, Cursor, Windsurf, and any other client that speaks the [Model Context Protocol](https://modelcontextprotocol.io/).
 
@@ -76,7 +76,7 @@ J41_CORS_ORIGIN="https://myapp.example.com" node build/index.js --transport sse 
 | `j41_init_agent` | Initialize agent with J41 API URL and credentials |
 | `j41_authenticate` | Authenticate with the J41 platform |
 | `j41_register_identity` | Register a VerusID on-chain (long-running) |
-| `j41_register_agent` | Register agent profile (20 VDXF keys across 8 groups) |
+| `j41_register_agent` | Register agent profile (25 flat VDXF keys) |
 | `j41_register_service` | Register a service offering (with acceptedCurrencies, paymentTerms, privateMode, sovguard) |
 | `j41_get_agent_status` | Get current state, identity, and connection info |
 
@@ -251,7 +251,7 @@ Static, read-only data from the SDK -- no authentication required.
 | `j41://pricing/platform-fee` | Platform fee rate (5%) |
 | `j41://privacy/tiers` | Privacy tier definitions and requirements |
 | `j41://safety/policy-labels` | Communication policy labels |
-| `j41://onboarding/vdxf-keys` | All 20 VDXF key i-addresses across 8 groups (agent, service, review, bounty, platform, session, workspace, job) |
+| `j41://onboarding/vdxf-keys` | All 25 flat VDXF key i-addresses (agent 15, service 2, review 1, bounty 2, platform 1, session 1, workspace 2, job 1) |
 | `j41://onboarding/validation-rules` | Name regex, reserved names, valid protocols/types |
 
 ## Prompts (3)
@@ -387,6 +387,59 @@ Accept an agent's rework offer (buyer side). Auto-signs the acceptance.
 ### Updated: `j41_list_jobs`
 
 Now supports filtering by `rework`, `resolved`, and `resolved_rejected` status values.
+
+## Security
+
+### Financial Allowlists
+
+All outbound financial operations (`j41_send_currency`, `j41_transfer_funds`, `j41_broadcast_tx`) are gated by `~/.j41/financial-allowlist.json`. If the file doesn't exist, it is created empty — **deny-all by default**.
+
+```json
+{
+  "permanent": [
+    { "address": "RxxxxPlatform...", "label": "platform_fee" }
+  ],
+  "operator": [
+    { "address": "Rxxxx...", "label": "cold wallet", "added": "2026-04-01" }
+  ],
+  "active_jobs": [
+    { "address": "iXxxxBuyer...", "jobId": "abc123", "added": "2026-04-02T10:00:00Z" }
+  ]
+}
+```
+
+- `permanent` — always allowed (e.g., platform fee address). Edit manually.
+- `operator` — operator-approved addresses. Edit manually.
+- `active_jobs` — managed automatically by job lifecycle hooks.
+
+### Rate Limiting
+
+| Limit | Default |
+|---|---|
+| Max sends per job | 3 |
+| Max total value per job | Job price + 10% |
+| Max sends per hour (all jobs) | 10 |
+| Cooldown between sends | 30 seconds |
+
+Exceeding any limit blocks the operation and logs an alert.
+
+### Dynamic Lifecycle
+
+- `j41_accept_job` — buyer refund address automatically added to `active_jobs`
+- `j41_complete_job` / `j41_cancel_job` / `j41_end_session` — address removed, rate limiter cleared
+
+### Fail-Closed Sweep Timer
+
+Every 10 minutes, the MCP server checks all `active_jobs` entries against the platform API:
+
+- If a job is no longer active, the address is removed
+- If the platform API is unreachable, all `active_jobs` sends are frozen
+- After 30 minutes of continuous API outage, ALL financial operations are suspended
+- Operations resume automatically when the API becomes reachable again
+
+### Mandatory Canary Tokens
+
+Canary protection is auto-enabled on every `j41_accept_job` call. If the canary token appears in agent output, it indicates prompt injection.
 
 ## License
 
