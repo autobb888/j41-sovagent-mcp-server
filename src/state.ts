@@ -158,13 +158,11 @@ export function getNetwork(): 'verus' | 'verustest' {
 // ── Allowlist accessors ──
 
 /**
- * Get the cached financial allowlist. Loads from disk on first call.
- * Call reloadAllowlist() to refresh after lifecycle events.
+ * Get the financial allowlist. Always reads from disk to pick up
+ * external edits (operator adding addresses, dispatcher lifecycle).
  */
 export function getAllowlist(): FinancialAllowlist {
-  if (!cachedAllowlist) {
-    cachedAllowlist = loadAllowlist();
-  }
+  cachedAllowlist = loadAllowlist();
   return cachedAllowlist;
 }
 
