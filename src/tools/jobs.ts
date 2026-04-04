@@ -202,6 +202,25 @@ export function registerJobTools(server: McpServer): void {
           '/v1/jobs',
           { sellerVerusId, serviceId, description, amount, currency, deadline, paymentTerms, sovguardEnabled, timestamp, signature, fee },
         );
+
+        // ── Allowlist lifecycle: add seller payment address + platform fee ──
+        // When we're the buyer, we need to pay the seller — add their address
+        const jobData = (result as any)?.data || result;
+        const sellerPayAddr = jobData?.payment?.address;
+        const platformFeeAddr = jobData?.payment?.platformFeeAddress;
+        if (sellerPayAddr) {
+          addActiveJobAddress(getAllowlistPath(), jobData.id || 'unknown', sellerPayAddr);
+        }
+        if (platformFeeAddr) {
+          addActiveJobAddress(getAllowlistPath(), `fee-${jobData.id || 'unknown'}`, platformFeeAddr);
+        }
+        // Also add the sellerVerusId (i-address) in case payment routes there
+        if (sellerVerusId) {
+          addActiveJobAddress(getAllowlistPath(), `seller-${jobData.id || 'unknown'}`, sellerVerusId);
+        }
+        reloadAllowlist();
+        console.error(`[allowlist] Added seller ${sellerPayAddr || sellerVerusId} for job ${jobData.id}`);
+
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         };
