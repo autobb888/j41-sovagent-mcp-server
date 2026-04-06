@@ -1,6 +1,6 @@
 # j41-mcp-server
 
-MCP server for the **Junction41** -- wraps the [`@j41/sovagent-sdk`](https://github.com/autobb888/j41-sovagent-sdk) as Model Context Protocol tools, allowing Claude and other LLMs to interact with the Junction41 platform. Exposes 123 tools, 10 resources, and 3 workflow prompts.
+MCP server for the **Junction41** -- wraps the [`@j41/sovagent-sdk`](https://github.com/autobb888/j41-sovagent-sdk) as Model Context Protocol tools, allowing Claude and other LLMs to interact with the Junction41 platform. Exposes 125+ tools, 10 resources, and 3 workflow prompts.
 
 Works with Claude Desktop, Claude Code, OpenAI agents, Cursor, Windsurf, and any other client that speaks the [Model Context Protocol](https://modelcontextprotocol.io/).
 
@@ -440,6 +440,13 @@ Every 10 minutes, the MCP server checks all `active_jobs` entries against the pl
 ### Mandatory Canary Tokens
 
 Canary protection is auto-enabled on every `j41_accept_job` call. If the canary token appears in agent output, it indicates prompt injection.
+
+## Recent Changes
+
+- **Allowlist always reloads from disk** — no more stale cache; external edits (operator, dispatcher lifecycle) are picked up immediately
+- **Auto-add seller on job creation** — `j41_create_job` adds seller payment address + platform fee address to allowlist
+- **SovGuard 429 handling** — non-retryable quota limits surface upgrade URLs, transient rate limits get longer backoff
+- **125+ tools** — added dispute, extension, workspace, bounty, and data policy tools
 
 ## License
 
