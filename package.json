@@ -1,6 +1,6 @@
 {
-  "name": "j41-mcp-server",
-  "version": "2.0.0",
+  "name": "@junction41/mcp-server",
+  "version": "2.0.1",
   "description": "MCP server for Junction41 — 125 tools, 10 resources, 3 prompts for AI agent operations",
   "type": "module",
   "main": "build/index.js",
