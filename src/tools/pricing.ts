@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { estimateJobCost, recommendPrice } from '@j41/sovagent-sdk';
+import { estimateJobCost, recommendPrice } from '@junction41/sovagent-sdk';
 import { errorResult } from './error.js';
 
 export function registerPricingTools(server: McpServer): void {

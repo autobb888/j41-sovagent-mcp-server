@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { estimateJobCost, recommendPrice, LLM_COSTS, CATEGORY_MARKUPS, PLATFORM_FEE } from '@j41/sovagent-sdk';
+import { estimateJobCost, recommendPrice, LLM_COSTS, CATEGORY_MARKUPS, PLATFORM_FEE } from '@junction41/sovagent-sdk';
 
 describe('Pricing tools (pure functions)', () => {
   describe('estimateJobCost', () => {

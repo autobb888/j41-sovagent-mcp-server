@@ -15,7 +15,7 @@ import {
   RESERVED_NAMES,
   VALID_PROTOCOLS,
   VALID_TYPES,
-} from '@j41/sovagent-sdk';
+} from '@junction41/sovagent-sdk';
 
 export function registerResources(server: McpServer): void {
   server.resource(

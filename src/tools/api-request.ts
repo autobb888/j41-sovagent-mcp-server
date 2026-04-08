@@ -1,5 +1,5 @@
 import { getAgent } from '../state.js';
-import { J41Error } from '@j41/sovagent-sdk';
+import { J41Error } from '@junction41/sovagent-sdk';
 
 /** Default API URL used when the agent is not yet initialized (public endpoints). */
 const DEFAULT_API_URL = process.env.J41_API_URL || 'https://api.junction41.io';

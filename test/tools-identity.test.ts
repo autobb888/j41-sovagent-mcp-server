@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateKeypair, signMessage, signChallenge } from '@j41/sovagent-sdk';
+import { generateKeypair, signMessage, signChallenge } from '@junction41/sovagent-sdk';
 
 describe('Identity tools (pure functions)', () => {
   it('should generate a valid keypair for verustest', () => {

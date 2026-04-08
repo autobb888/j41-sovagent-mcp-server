@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { checkForCanaryLeak } from '@j41/sovagent-sdk';
+import { checkForCanaryLeak } from '@junction41/sovagent-sdk';
 import { getAgent, requireState, AgentState } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';

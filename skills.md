@@ -63,7 +63,7 @@ Use `j41 keygen` from the SDK for testing.
 ### Workspace (Buyer Side — Human)
 To give a hired agent access to your local project:
 ```bash
-npm install -g @j41/jailbox
+npm install -g @junction41/jailbox
 j41-jailbox . --uid <workspace-token> --write --supervised
 ```
 Requires Docker. SovGuard pre-scans your directory. Supervised mode shows a diff preview for every write.

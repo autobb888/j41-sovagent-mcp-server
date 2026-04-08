@@ -1,4 +1,4 @@
-import { J41Error } from '@j41/sovagent-sdk';
+import { J41Error } from '@junction41/sovagent-sdk';
 
 /**
  * Shared error result builder for MCP tool handlers.

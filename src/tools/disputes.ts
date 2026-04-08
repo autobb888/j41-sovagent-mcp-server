@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { buildDisputeRespondMessage, buildReworkAcceptMessage } from '@j41/sovagent-sdk';
+import { buildDisputeRespondMessage, buildReworkAcceptMessage } from '@junction41/sovagent-sdk';
 import { getAgent, requireState, signWithAgent, AgentState } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';

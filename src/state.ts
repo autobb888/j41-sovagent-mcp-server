@@ -4,7 +4,7 @@ import {
   keypairFromWIF,
   signMessage,
   J41Error,
-} from '@j41/sovagent-sdk';
+} from '@junction41/sovagent-sdk';
 import { RateLimiter, loadAllowlist, getAllowlistPath, type FinancialAllowlist } from './allowlist.js';
 import { disconnectAllWorkspaces } from './tools/workspace.js';
 

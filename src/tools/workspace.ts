@@ -9,7 +9,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { errorResult } from './error.js';
 import { requireState, getAgent, AgentState } from '../state.js';
-import { WorkspaceClient } from '@j41/sovagent-sdk';
+import { WorkspaceClient } from '@junction41/sovagent-sdk';
 
 // Active workspace connections — one per job for multi-job support.
 // Each job gets its own WorkspaceClient instance (NOT agent.workspace singleton).

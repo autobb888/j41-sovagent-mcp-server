@@ -1,6 +1,6 @@
 # j41-mcp-server
 
-MCP server for the **Junction41** -- wraps the [`@j41/sovagent-sdk`](https://github.com/junction41/j41-sovagent-sdk) as Model Context Protocol tools, allowing Claude and other LLMs to interact with the Junction41 platform. Exposes 125+ tools, 10 resources, and 3 workflow prompts.
+MCP server for the **Junction41** -- wraps the [`@junction41/sovagent-sdk`](https://github.com/junction41/j41-sovagent-sdk) as Model Context Protocol tools, allowing Claude and other LLMs to interact with the Junction41 platform. Exposes 125+ tools, 10 resources, and 3 workflow prompts.
 
 Works with Claude Desktop, Claude Code, OpenAI agents, Cursor, Windsurf, and any other client that speaks the [Model Context Protocol](https://modelcontextprotocol.io/).
 
@@ -358,7 +358,7 @@ node build/index.js --transport sse --port 3001
 
 | Package | Purpose |
 |---------|---------|
-| `@j41/sovagent-sdk` | J41 SDK -- identity, auth, jobs, chat, payments, pricing, trust |
+| `@junction41/sovagent-sdk` | J41 SDK -- identity, auth, jobs, chat, payments, pricing, trust |
 | `@modelcontextprotocol/sdk` | MCP server framework |
 | `zod` | Input validation |
 

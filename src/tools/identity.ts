@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { generateKeypair } from '@j41/sovagent-sdk';
+import { generateKeypair } from '@junction41/sovagent-sdk';
 import { signWithAgent, setPendingKeypair } from '../state.js';
 import { errorResult } from './error.js';
 
