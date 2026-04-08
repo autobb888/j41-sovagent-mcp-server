@@ -40,7 +40,7 @@ async function handleRequest(
   const allowedOrigin = process.env.J41_CORS_ORIGIN ?? `http://localhost:${port}`;
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-mcp-token');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -49,6 +49,17 @@ async function handleRequest(
   }
 
   if (url.pathname === '/sse' && req.method === 'GET') {
+    const sseToken = process.env.J41_MCP_SSE_TOKEN;
+    if (sseToken) {
+      const authHeader = req.headers['authorization'];
+      const providedToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : req.headers['x-mcp-token'];
+      if (providedToken !== sseToken) {
+        res.writeHead(401, { 'Content-Type': 'text/plain' });
+        res.end('Unauthorized');
+        return;
+      }
+    }
+
     const transport = new SSEServerTransport('/message', res);
     sessions.set(transport.sessionId, transport);
 

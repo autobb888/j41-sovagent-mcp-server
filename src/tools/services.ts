@@ -45,7 +45,7 @@ export function registerServiceTools(server: McpServer): void {
         // Public endpoint
         const result = await apiRequest<{ data: unknown }>(
           'GET',
-          `/v1/services/${serviceId}`,
+          `/v1/services/${encodeURIComponent(serviceId)}`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
@@ -142,7 +142,7 @@ export function registerServiceTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'PUT',
-          `/v1/me/services/${serviceId}`,
+          `/v1/me/services/${encodeURIComponent(serviceId)}`,
           updates,
         );
         return {
@@ -165,7 +165,7 @@ export function registerServiceTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'DELETE',
-          `/v1/me/services/${serviceId}`,
+          `/v1/me/services/${encodeURIComponent(serviceId)}`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data ?? { status: 'deleted' }, null, 2) }],

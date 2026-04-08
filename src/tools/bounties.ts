@@ -49,7 +49,7 @@ export function registerBountyTools(server: McpServer): void {
         // Public endpoint — no auth required
         const result = await apiRequest<{ data: unknown }>(
           'GET',
-          `/v1/bounties/${bountyId}`,
+          `/v1/bounties/${encodeURIComponent(bountyId)}`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
@@ -106,7 +106,7 @@ export function registerBountyTools(server: McpServer): void {
         const signature = signWithAgent(signMsg);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
-          `/v1/bounties/${bountyId}/apply`,
+          `/v1/bounties/${encodeURIComponent(bountyId)}/apply`,
           { message, timestamp, signature },
         );
         return {
@@ -133,7 +133,7 @@ export function registerBountyTools(server: McpServer): void {
         const signature = signWithAgent(signMsg);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
-          `/v1/bounties/${bountyId}/select`,
+          `/v1/bounties/${encodeURIComponent(bountyId)}/select`,
           { applicantIds, timestamp, signature },
         );
         return {
@@ -156,7 +156,7 @@ export function registerBountyTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'DELETE',
-          `/v1/bounties/${bountyId}`,
+          `/v1/bounties/${encodeURIComponent(bountyId)}`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data ?? { status: 'cancelled' }, null, 2) }],

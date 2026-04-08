@@ -76,7 +76,7 @@ export function registerJobTools(server: McpServer): void {
         }
 
         // ── Mandatory canary: auto-enable on job accept ──
-        import('../safety.js').then(m => m.ensureCanaryEnabled()).catch(() => {});
+        import('./safety.js').then(m => m.ensureCanaryEnabled()).catch(() => {});
 
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(job, null, 2) }],
@@ -125,7 +125,7 @@ export function registerJobTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
         // Fetch job details to get jobHash for correct signing format
-        const jobData = await apiRequest<{ data: { jobHash: string } }>('GET', `/v1/jobs/${jobId}`);
+        const jobData = await apiRequest<{ data: { jobHash: string } }>('GET', `/v1/jobs/${encodeURIComponent(jobId)}`);
         const jobHash = jobData.data.jobHash;
         const timestamp = Math.floor(Date.now() / 1000);
         const message = `J41-COMPLETE|Job:${jobHash}|Ts:${timestamp}|I confirm the work has been delivered satisfactorily.`;
@@ -188,24 +188,21 @@ export function registerJobTools(server: McpServer): void {
     async ({ sellerVerusId, serviceId, description, amount, currency, deadline, paymentTerms, sovguardEnabled }) => {
       try {
         requireState(AgentState.Authenticated);
-        const timestamp = Math.floor(Date.now() / 1000);
-        const fee = amount * 0.05;
-        const paymentCommitment = paymentTerms === 'prepay'
-          ? 'I request this job and agree to pay upfront before work begins.'
-          : paymentTerms === 'postpay'
-            ? 'I request this job and agree to pay upon delivery.'
-            : 'I request this job and agree to split payment (50% upfront, 50% on delivery).';
-        const message = `J41-JOB|To:${sellerVerusId}|Desc:${description}|Amt:${Number(amount).toFixed(4)} ${currency}|Fee:${fee.toFixed(4)} ${currency}|Pay:${paymentTerms}|SovGuard:${sovguardEnabled ? 'yes' : 'no'}|Retain:none|Train:no|3rdParty:no|DelAttest:yes|Deadline:${deadline || 'None'}|Ts:${timestamp}|${paymentCommitment}`;
-        const signature = signWithAgent(message);
-        const result = await apiRequest<{ data: unknown }>(
-          'POST',
-          '/v1/jobs',
-          { sellerVerusId, serviceId, description, amount, currency, deadline, paymentTerms, sovguardEnabled, timestamp, signature, fee },
-        );
+        const agent = getAgent();
+        const result = await agent.createJob({
+          sellerVerusId,
+          serviceId,
+          description,
+          amount,
+          currency,
+          deadline,
+          paymentTerms,
+          sovguardEnabled,
+        });
+        const jobResult = result as any;
 
         // ── Allowlist lifecycle: add seller payment address + platform fee ──
-        // When we're the buyer, we need to pay the seller — add their address
-        const jobData = (result as any)?.data || result;
+        const jobData = jobResult?.data || jobResult;
         const sellerPayAddr = jobData?.payment?.address;
         const platformFeeAddr = jobData?.payment?.platformFeeAddress;
         if (sellerPayAddr) {
@@ -241,7 +238,7 @@ export function registerJobTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
-          `/v1/jobs/${jobId}/end-session`,
+          `/v1/jobs/${encodeURIComponent(jobId)}/end-session`,
         );
 
         // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
@@ -271,7 +268,7 @@ export function registerJobTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
-          `/v1/jobs/${jobId}/reject-delivery`,
+          `/v1/jobs/${encodeURIComponent(jobId)}/reject-delivery`,
           { reason },
         );
         return {
@@ -295,7 +292,7 @@ export function registerJobTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
         // Fetch job details to get jobHash for correct signing format
-        const jobData = await apiRequest<{ data: { jobHash: string } }>('GET', `/v1/jobs/${jobId}`);
+        const jobData = await apiRequest<{ data: { jobHash: string } }>('GET', `/v1/jobs/${encodeURIComponent(jobId)}`);
         const jobHash = jobData.data.jobHash;
         const timestamp = Math.floor(Date.now() / 1000);
         const message = `J41-DISPUTE|Job:${jobHash}|Reason:${reason}|Ts:${timestamp}|I am raising a dispute on this job.`;
@@ -388,7 +385,7 @@ export function registerJobTools(server: McpServer): void {
         const limiter = getRateLimiter();
         const total = outputs.reduce((s: number, o: { amount: number }) => s + o.amount, 0);
         const jobId = '_standalone';
-        const jobPrice = 0;
+        const jobPrice = Infinity;
 
         for (const output of outputs) {
           const gate = checkFinancialOp(output.address, output.amount, jobId, jobPrice, allowlist, limiter);
@@ -419,4 +416,3 @@ export function registerJobTools(server: McpServer): void {
     },
   );
 }
-

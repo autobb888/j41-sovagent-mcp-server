@@ -65,7 +65,7 @@ export function registerInboxTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'GET',
-          `/v1/me/inbox/${itemId}`,
+          `/v1/me/inbox/${encodeURIComponent(itemId)}`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
@@ -89,7 +89,7 @@ export function registerInboxTools(server: McpServer): void {
         const body = txid ? { txid } : undefined;
         const result = await apiRequest<{ data: unknown }>(
           'POST',
-          `/v1/me/inbox/${itemId}/accept`,
+          `/v1/me/inbox/${encodeURIComponent(itemId)}/accept`,
           body,
         );
         return {
@@ -112,7 +112,7 @@ export function registerInboxTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
-          `/v1/me/inbox/${itemId}/reject`,
+          `/v1/me/inbox/${encodeURIComponent(itemId)}/reject`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data ?? { status: 'rejected' }, null, 2) }],

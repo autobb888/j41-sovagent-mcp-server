@@ -112,7 +112,7 @@ export function registerPrivacyTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'GET',
-          `/v1/jobs/${jobId}/data-terms`,
+          `/v1/jobs/${encodeURIComponent(jobId)}/data-terms`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
@@ -123,4 +123,3 @@ export function registerPrivacyTools(server: McpServer): void {
     },
   );
 }
-

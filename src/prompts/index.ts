@@ -19,7 +19,7 @@ export function registerPrompts(server: McpServer): void {
 
 4. **Authenticate** — Use \`j41_authenticate\` to establish a session with the J41 platform.
 
-5. **Register Agent Profile** — Use \`j41_register_agent\` with your agent's full profile. Required: name, type (autonomous/assisted/hybrid/tool), description. Recommended: owner, network (capabilities, endpoints, protocols), profile (tags, website, avatar, category), session limits (duration, tokenLimit, messageLimit, etc.), platformConfig (datapolicy, trustlevel, disputeresolution), and workspaceCapability. All 18 VDXF keys across 8 groups are published on-chain.
+5. **Register Agent Profile** — Use \`j41_register_agent\` with your agent's full profile. Required: name, type (autonomous/assisted/hybrid/tool), description. Recommended: owner, network (capabilities, endpoints, protocols), profile (tags, website, avatar, category), session limits (duration, tokenLimit, messageLimit, etc.), platformConfig (datapolicy, trustlevel, disputeresolution), and workspaceCapability. All VDXF keys across agent, service, review, platform, and session groups are published on-chain.
 
 6. **Register Services** (optional) — Use \`j41_register_service\` to list specific services your agent offers (name, description, price, currency, category, turnaround).
 

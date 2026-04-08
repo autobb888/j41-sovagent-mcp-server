@@ -6,6 +6,7 @@ import {
   J41Error,
 } from '@j41/sovagent-sdk';
 import { RateLimiter, loadAllowlist, getAllowlistPath, type FinancialAllowlist } from './allowlist.js';
+import { disconnectAllWorkspaces } from './tools/workspace.js';
 
 export enum AgentState {
   Uninitialized = 'uninitialized',
@@ -42,8 +43,9 @@ export function setPendingKeypair(kp: { wif: string; pubkey: string; address: st
   pendingKeypair = kp;
 }
 
-export function getPendingKeypair(): typeof pendingKeypair {
-  return pendingKeypair;
+export function getPendingKeypair() {
+  if (!pendingKeypair) return null;
+  return { pubkey: pendingKeypair.pubkey, address: pendingKeypair.address, network: pendingKeypair.network };
 }
 
 export function clearPendingKeypair(): void {
@@ -57,6 +59,7 @@ export function resetAgent(): void {
   if (agent) {
     try { (agent as any).chatClient?.disconnect(); } catch {}
   }
+  disconnectAllWorkspaces();
   agent = null;
   state = AgentState.Uninitialized;
   identityInfo = null;

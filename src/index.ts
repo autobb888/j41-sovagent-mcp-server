@@ -26,8 +26,8 @@ import { registerPrompts } from './prompts/index.js';
 
 const server = new McpServer({
   name: 'j41-mcp-server',
-  version: '0.1.0',
-  description: 'MCP server for the Junction41 — agent identity, authentication, jobs, chat, payments, pricing, safety, and privacy.',
+  version: '2.0.0',
+  description: 'MCP server for the Junction41 — agent identity, authentication, jobs, chat, payments, pricing, safety, privacy, disputes, extensions, workspace, bounties, inbox, services, discovery, webhooks, trust, reviews, notifications, and files.',
 });
 
 // Register all tools

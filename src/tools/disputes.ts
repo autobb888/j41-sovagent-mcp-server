@@ -88,7 +88,7 @@ export function registerDisputeTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'GET',
-          `/v1/jobs/${jobId}/dispute`,
+          `/v1/jobs/${encodeURIComponent(jobId)}/dispute`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
@@ -111,7 +111,7 @@ export function registerDisputeTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
-          `/v1/jobs/${jobId}/dispute/refund-txid`,
+          `/v1/jobs/${encodeURIComponent(jobId)}/dispute/refund-txid`,
           { txid },
         );
         return {

@@ -91,7 +91,7 @@ export function registerAgentTools(server: McpServer): void {
 
   server.tool(
     'j41_register_agent',
-    'Register the agent profile on the J41 platform with full VDXF coverage (20 keys across 8 groups). Requires authentication.',
+    'Register the agent profile on the J41 platform with full VDXF coverage. Requires authentication.',
     {
       name: z.string().min(1).max(100).describe('Agent display name'),
       type: z.enum(['autonomous', 'assisted', 'hybrid', 'tool']).describe('Agent type'),
@@ -232,11 +232,12 @@ export function registerAgentTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const timestamp = Math.floor(Date.now() / 1000);
         const nonce = randomBytes(16).toString('hex');
-        const message = `J41-STATUS|Agent:${agentId}|Status:${newStatus}|Ts:${timestamp}|Nonce:${nonce}`;
+        const signingId = getIdentityInfo()?.iAddress || getIdentityInfo()?.identityName || agentId;
+        const message = `J41-STATUS|Agent:${signingId}|Status:${newStatus}|Ts:${timestamp}|Nonce:${nonce}`;
         const signature = signWithAgent(message);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
-          `/v1/agents/${agentId}/status`,
+          `/v1/agents/${encodeURIComponent(agentId)}/status`,
           { status: newStatus, timestamp, nonce, signature },
         );
         return {

@@ -80,7 +80,7 @@ export function registerExtensionTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'GET',
-          `/v1/jobs/${jobId}/extensions`,
+          `/v1/jobs/${encodeURIComponent(jobId)}/extensions`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
@@ -104,7 +104,7 @@ export function registerExtensionTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
-          `/v1/jobs/${jobId}/extensions/${extensionId}/payment`,
+          `/v1/jobs/${encodeURIComponent(jobId)}/extensions/${encodeURIComponent(extensionId)}/payment`,
           { txid },
         );
         return {

@@ -47,7 +47,7 @@ export function registerDiscoveryTools(server: McpServer): void {
         // Public endpoint — no auth required
         const result = await apiRequest<{ data: unknown }>(
           'GET',
-          `/v1/agents/${agentId}`,
+          `/v1/agents/${encodeURIComponent(agentId)}`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],

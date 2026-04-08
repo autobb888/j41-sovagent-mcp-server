@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { generateKeypair, signMessage, signChallenge } from '@j41/sovagent-sdk';
-import { signWithAgent, getNetwork } from '../state.js';
+import { generateKeypair } from '@j41/sovagent-sdk';
+import { signWithAgent, setPendingKeypair } from '../state.js';
 import { errorResult } from './error.js';
 
 export function registerIdentityTools(server: McpServer): void {
@@ -12,6 +12,7 @@ export function registerIdentityTools(server: McpServer): void {
     async ({ network }) => {
       try {
         const kp = generateKeypair(network);
+        setPendingKeypair({ wif: kp.wif, pubkey: kp.pubkey, address: kp.address, network });
         return {
           content: [{
             type: 'text' as const,
@@ -31,17 +32,13 @@ export function registerIdentityTools(server: McpServer): void {
 
   server.tool(
     'j41_sign_message',
-    'Sign an arbitrary message. Uses the stored WIF by default; optionally provide an explicit WIF.',
+    'Sign an arbitrary message using the stored key.',
     {
-      wif: z.string().min(1).optional().describe('WIF-encoded private key (uses stored key if omitted)'),
       message: z.string().min(1).describe('Message to sign'),
-      network: z.enum(['verus', 'verustest']).default('verustest').describe('Verus network'),
     },
-    async ({ wif, message, network }) => {
+    async ({ message }) => {
       try {
-        const signature = wif
-          ? signMessage(wif, message, network)
-          : signWithAgent(message);
+        const signature = signWithAgent(message);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ signature }) }],
         };
@@ -53,22 +50,13 @@ export function registerIdentityTools(server: McpServer): void {
 
   server.tool(
     'j41_sign_challenge',
-    'Sign an authentication challenge for a specific i-address. Uses the stored WIF by default.',
+    'Sign an authentication challenge using the stored agent key.',
     {
-      wif: z.string().min(1).optional().describe('WIF-encoded private key (uses stored key if omitted)'),
       challenge: z.string().min(1).describe('Challenge string from J41'),
-      iAddress: z.string().min(1).describe('i-address to sign for'),
-      network: z.enum(['verus', 'verustest']).default('verustest').describe('Verus network'),
     },
-    async ({ wif, challenge, iAddress, network }) => {
+    async ({ challenge }) => {
       try {
-        if (!wif) {
-          const signature = signWithAgent(challenge);
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ signature }) }],
-          };
-        }
-        const signature = signChallenge(wif, challenge, iAddress, network);
+        const signature = signWithAgent(challenge);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ signature }) }],
         };

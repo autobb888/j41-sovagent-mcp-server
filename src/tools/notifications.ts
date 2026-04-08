@@ -79,7 +79,7 @@ export function registerNotificationTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
-          `/v1/alerts/${alertId}/dismiss`,
+          `/v1/me/alerts/${encodeURIComponent(alertId)}/dismiss`,
         );
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result.data ?? { status: 'dismissed' }, null, 2) }],

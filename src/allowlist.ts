@@ -350,7 +350,6 @@ export function logBlockedOperation(
 // ── Sweep Timer ──
 
 const SWEEP_INTERVAL_MS = 10 * 60 * 1000;  // 10 minutes
-const SWEEP_RETRY_MS = 2 * 60 * 1000;      // 2 minutes on API failure
 const SUSPEND_AFTER_MS = 30 * 60 * 1000;   // 30 minutes of API outage → global suspend
 
 let sweepTimer: ReturnType<typeof setInterval> | null = null;

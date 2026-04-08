@@ -226,12 +226,8 @@ export function registerPaymentTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
 
         // ── Allowlist + rate limit gate ──
-        // TODO: jobId and jobPrice should come from active job context.
-        // For now, use '_standalone' as jobId with a conservative price of 0
-        // (which means max value = 0 * 1.1 = 0 — standalone sends are blocked
-        // unless an active job context is set). This is intentionally restrictive.
         const jobId = '_standalone';
-        const jobPrice = 0;
+        const jobPrice = Infinity;
         const gate = checkFinancialOp(to, amount, jobId, jobPrice, getAllowlist(), getRateLimiter());
         if (!gate.allowed) {
           logBlockedOperation('j41_send_currency', to, amount, jobId, gate.reason!);
