@@ -10,6 +10,11 @@ import { errorResult } from './error.js';
 // we capture the token from the result's systemPromptInsert or by listening for the event.
 let storedCanaryToken: string | null = null;
 
+/** Get the current canary token (for outbound leak checking in other tools) */
+export function getCanaryToken(): string | null {
+  return storedCanaryToken;
+}
+
 /**
  * Auto-enable canary protection if not already active.
  * Called by job lifecycle hooks (accept_job) to enforce mandatory canary tokens.

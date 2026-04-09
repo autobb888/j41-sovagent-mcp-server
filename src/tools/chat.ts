@@ -1,8 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { checkForCanaryLeak } from '@junction41/sovagent-sdk';
 import { getAgent, requireState, AgentState } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
+import { getCanaryToken } from './safety.js';
 
 export function registerChatTools(server: McpServer): void {
   server.tool(
@@ -34,6 +36,23 @@ export function registerChatTools(server: McpServer): void {
       try {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
+
+        // Canary leak check — block message if system prompt was leaked
+        const canaryToken = getCanaryToken();
+        if (canaryToken && checkForCanaryLeak(content, canaryToken)) {
+          console.error(`[CANARY] ⚠️ LEAK DETECTED in j41_send_message — blocked`);
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                status: 'blocked',
+                reason: 'Message contained a canary token (possible system prompt leak). Message was NOT sent.',
+              }),
+            }],
+            isError: true,
+          };
+        }
+
         agent.sendChatMessage(jobId, content);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ status: 'sent', jobId }) }],

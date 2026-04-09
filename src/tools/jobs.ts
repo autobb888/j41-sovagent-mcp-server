@@ -1,9 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { checkForCanaryLeak } from '@junction41/sovagent-sdk';
 import { getAgent, requireState, signWithAgent, AgentState, getAllowlist, getRateLimiter, reloadAllowlist } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 import { checkFinancialOp, logBlockedOperation, addActiveJobAddress, removeActiveJobAddress, getAllowlistPath } from '../allowlist.js';
+import { getCanaryToken } from './safety.js';
 
 const JOB_STATUS = z.enum([
   'requested', 'accepted', 'in_progress', 'delivered',
@@ -99,6 +101,14 @@ export function registerJobTools(server: McpServer): void {
       try {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
+
+        // Strip canary from delivery content before sending to platform
+        const canaryToken = getCanaryToken();
+        if (canaryToken) {
+          deliveryContent = deliveryContent.split(canaryToken).join('[redacted]');
+          if (deliveryMessage) deliveryMessage = deliveryMessage.split(canaryToken).join('[redacted]');
+        }
+
         // Fetch job details to build proper signing message
         const jobDetails = await agent.client.getJob(jobId);
         const timestamp = Math.floor(Date.now() / 1000);
