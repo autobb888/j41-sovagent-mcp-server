@@ -35,10 +35,8 @@ This skill bridges to the Junction41 MCP server.
 
 ### Setup (Local MCP Server)
 ```bash
-git clone https://github.com/junction41/j41-sovagent-mcp-server.git
-cd j41-sovagent-mcp-server
-npm install && npm run build
-node build/index.js --transport sse --port 3001
+npm install -g @junction41/mcp-server
+j41-mcp-server --transport sse --port 3001
 ```
 
 ### MCP Config
@@ -46,8 +44,8 @@ node build/index.js --transport sse --port 3001
 {
   "mcpServers": {
     "junction41": {
-      "command": "node",
-      "args": ["./j41-sovagent-mcp-server/build/index.js"],
+      "command": "j41-mcp-server",
+      "args": [],
       "env": {
         "J41_API_URL": "https://api.junction41.io",
         "J41_WIF": "<your-agent-private-key-WIF>"

@@ -4,20 +4,20 @@ MCP server for the **Junction41** -- wraps the [`@junction41/sovagent-sdk`](http
 
 Works with Claude Desktop, Claude Code, OpenAI agents, Cursor, Windsurf, and any other client that speaks the [Model Context Protocol](https://modelcontextprotocol.io/).
 
+## Install
+
+```bash
+npm install -g @junction41/mcp-server
+```
+
 ## Quick Start
 
 ```bash
-# Clone and install
-git clone https://github.com/junction41/j41-sovagent-mcp-server.git
-cd j41-sovagent-mcp-server
-yarn install
-yarn build
-
 # Run on stdio (default)
-node build/index.js
+j41-mcp-server
 
 # Run on SSE
-node build/index.js --transport sse --port 3001
+j41-mcp-server --transport sse --port 3001
 ```
 
 ### Claude Desktop
@@ -28,8 +28,7 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 {
   "mcpServers": {
     "j41": {
-      "command": "node",
-      "args": ["path/to/j41-sovagent-mcp-server/build/index.js"]
+      "command": "j41-mcp-server"
     }
   }
 }
@@ -38,7 +37,7 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 ### Claude Code
 
 ```bash
-claude mcp add j41 node path/to/j41-sovagent-mcp-server/build/index.js
+claude mcp add j41 j41-mcp-server
 ```
 
 ### SSE Transport
@@ -56,7 +55,7 @@ claude mcp add j41 node path/to/j41-sovagent-mcp-server/build/index.js
 CORS is restricted to localhost by default. Set `J41_CORS_ORIGIN` to override:
 
 ```bash
-J41_CORS_ORIGIN="https://myapp.example.com" node build/index.js --transport sse --port 3001
+J41_CORS_ORIGIN="https://myapp.example.com" j41-mcp-server --transport sse --port 3001
 ```
 
 ## Tools (125)
@@ -351,7 +350,7 @@ yarn test
 yarn start
 
 # Start in SSE mode
-node build/index.js --transport sse --port 3001
+j41-mcp-server --transport sse --port 3001
 ```
 
 ## Dependencies
