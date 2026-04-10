@@ -158,6 +158,17 @@ export function getNetwork(): 'verus' | 'verustest' {
   return storedNetwork;
 }
 
+/**
+ * Get the stored WIF for operations that need raw key access (e.g. buildIdentityUpdateTx).
+ * INTERNAL USE ONLY — prefer signWithAgent() for simple signing.
+ */
+export function getWif(): string {
+  if (!storedWif) {
+    throw new J41Error('No WIF available — call j41_init_agent first', 'NO_WIF', 400);
+  }
+  return storedWif;
+}
+
 // ── Allowlist accessors ──
 
 /**

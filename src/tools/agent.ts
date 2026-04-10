@@ -1,8 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
-import { AGENT_NAME_REGEX } from '@junction41/sovagent-sdk';
-import { initAgent, getAgent, getState, setState, getIdentityInfo, requireState, signWithAgent, AgentState } from '../state.js';
+import { AGENT_NAME_REGEX, removeAndRewriteVdxfFields } from '@junction41/sovagent-sdk';
+import { initAgent, getAgent, getState, setState, getIdentityInfo, requireState, signWithAgent, getWif, getNetwork, AgentState } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
@@ -325,6 +325,48 @@ export function registerAgentTools(server: McpServer): void {
         const result = await agent.client.getMyIdentity();
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    'j41_update_profile',
+    'Update on-chain VDXF profile fields. Requires two blockchain transactions (remove old values + write new). Takes 1-3 minutes for block confirmation. Fields: displayName, description, type, payAddress, markup, models, profileCategory, profileTags, profileWebsite, profileAvatar, networkCapabilities, networkEndpoints, networkProtocols.',
+    {
+      fieldsToUpdate: z.record(z.string(), z.string()).describe('Map of VDXF field name → new value. Example: {"displayName": "New Name", "description": "Updated description"}'),
+    },
+    async ({ fieldsToUpdate }) => {
+      try {
+        requireState(AgentState.Authenticated);
+        const agent = getAgent();
+        const idInfo = getIdentityInfo();
+        if (!idInfo?.identityName) {
+          return errorResult(new Error('Agent identity name not available — register first'));
+        }
+
+        const result = await removeAndRewriteVdxfFields({
+          agent,
+          identityName: idInfo.identityName,
+          fieldsToUpdate,
+          chain: getNetwork(),
+          wif: getWif(),
+          onProgress: (msg) => console.error(`[VDXF] ${msg}`),
+        });
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              status: 'success',
+              removeTxid: result.removeTxid,
+              writeTxid: result.writeTxid,
+              blocksWaited: result.blocksWaited,
+              fieldsUpdated: Object.keys(fieldsToUpdate),
+            }, null, 2),
+          }],
         };
       } catch (err) {
         return errorResult(err);

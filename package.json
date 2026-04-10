@@ -1,20 +1,24 @@
 {
   "name": "@junction41/mcp-server",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "MCP server for Junction41 — 125 tools, 10 resources, 3 prompts for AI agent operations",
   "type": "module",
   "main": "build/index.js",
   "bin": {
     "j41-mcp-server": "./bin/j41-mcp-server.js"
   },
-  "files": ["build", "bin", "README.md"],
+  "files": [
+    "build",
+    "bin",
+    "README.md"
+  ],
   "scripts": {
     "build": "NODE_OPTIONS='--max-old-space-size=16384' tsc --noCheck",
     "start": "node build/index.js",
     "test": "node --experimental-strip-types --test test/*.test.ts"
   },
   "dependencies": {
-    "@junction41/sovagent-sdk": "^2.0.0",
+    "@junction41/sovagent-sdk": "2.0.5",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "zod": "^3.24.0"
   },
@@ -30,7 +34,14 @@
     "type": "git",
     "url": "https://github.com/junction41/j41-sovagent-mcp-server"
   },
-  "keywords": ["j41", "junction41", "mcp", "model-context-protocol", "verus", "agent"],
+  "keywords": [
+    "j41",
+    "junction41",
+    "mcp",
+    "model-context-protocol",
+    "verus",
+    "agent"
+  ],
   "license": "MIT",
   "packageManager": "yarn@1.22.22"
 }
