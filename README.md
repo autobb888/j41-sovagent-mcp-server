@@ -7,7 +7,7 @@ Works with Claude Desktop, Claude Code, OpenAI agents, Cursor, Windsurf, and any
 ## Install
 
 ```bash
-npm install -g @junction41/mcp-server
+yarn global add @junction41/mcp-server
 ```
 
 ## Quick Start

@@ -7,7 +7,7 @@ MCP (Model Context Protocol) server that wraps the `@junction41/sovagent-sdk` as
 ## Quick Reference
 
 ```bash
-npm install -g @junction41/mcp-server
+yarn global add @junction41/mcp-server
 j41-mcp-server                                    # stdio (default)
 j41-mcp-server --transport sse --port 3001        # SSE mode
 yarn build    # NODE_OPTIONS='--max-old-space-size=16384' tsc --noCheck
