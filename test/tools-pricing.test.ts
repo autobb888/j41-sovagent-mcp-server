@@ -5,20 +5,20 @@ import { estimateJobCost, recommendPrice, LLM_COSTS, CATEGORY_MARKUPS, PLATFORM_
 describe('Pricing tools (pure functions)', () => {
   describe('estimateJobCost', () => {
     it('should return a positive cost for a known model', () => {
-      const cost = estimateJobCost('gpt-4o', 2000, 1000);
+      const cost = estimateJobCost('gpt-4.1', 2000, 1000);
       assert.ok(cost > 0, 'cost should be positive');
       assert.equal(typeof cost, 'number');
     });
 
     it('should return higher cost for more tokens', () => {
-      const cost1 = estimateJobCost('gpt-4o', 1000, 500);
-      const cost2 = estimateJobCost('gpt-4o', 10000, 5000);
+      const cost1 = estimateJobCost('gpt-4.1', 1000, 500);
+      const cost2 = estimateJobCost('gpt-4.1', 10000, 5000);
       assert.ok(cost2 > cost1, 'more tokens should cost more');
     });
 
     it('should include additional API costs', () => {
-      const baseCost = estimateJobCost('gpt-4o', 2000, 1000);
-      const withApis = estimateJobCost('gpt-4o', 2000, 1000, [
+      const baseCost = estimateJobCost('gpt-4.1', 2000, 1000);
+      const withApis = estimateJobCost('gpt-4.1', 2000, 1000, [
         { api: 'web-search', count: 5 },
       ]);
       assert.ok(withApis >= baseCost, 'API costs should add to base cost');
@@ -28,7 +28,7 @@ describe('Pricing tools (pure functions)', () => {
   describe('recommendPrice', () => {
     it('should return four price points', () => {
       const rec = recommendPrice({
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         inputTokens: 2000,
         outputTokens: 1000,
         category: 'medium',
@@ -41,7 +41,7 @@ describe('Pricing tools (pure functions)', () => {
 
     it('price points should be in ascending order', () => {
       const rec = recommendPrice({
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         inputTokens: 2000,
         outputTokens: 1000,
         category: 'medium',
@@ -53,7 +53,7 @@ describe('Pricing tools (pure functions)', () => {
 
     it('should include rawCost and platformFee', () => {
       const rec = recommendPrice({
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         inputTokens: 2000,
         outputTokens: 1000,
         category: 'simple',
@@ -64,7 +64,7 @@ describe('Pricing tools (pure functions)', () => {
 
     it('should produce VRSC values when rate provided', () => {
       const rec = recommendPrice({
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         inputTokens: 2000,
         outputTokens: 1000,
         category: 'medium',
@@ -77,14 +77,14 @@ describe('Pricing tools (pure functions)', () => {
 
     it('should apply privacy premium for higher tiers', () => {
       const standard = recommendPrice({
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         inputTokens: 2000,
         outputTokens: 1000,
         category: 'medium',
         privacyTier: 'standard',
       });
       const sovereign = recommendPrice({
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         inputTokens: 2000,
         outputTokens: 1000,
         category: 'medium',
