@@ -189,10 +189,10 @@
     socket.io-client "^4.8.3"
     verus-typescript-primitives "git+https://github.com/VerusCoin/verus-typescript-primitives.git"
 
-"@modelcontextprotocol/sdk@^1.12.0":
-  version "1.27.1"
-  resolved "https://registry.yarnpkg.com/@modelcontextprotocol/sdk/-/sdk-1.27.1.tgz#a602cf823bf8a68e13e7112f50aeb02b09fb83b9"
-  integrity sha512-sr6GbP+4edBwFndLbM60gf07z0FQ79gaExpnsjMGePXqFcSSb7t6iscpjk9DhFhwd+mTEQrzNafGP8/iGGFYaA==
+"@modelcontextprotocol/sdk@^1.29.0":
+  version "1.29.0"
+  resolved "https://registry.yarnpkg.com/@modelcontextprotocol/sdk/-/sdk-1.29.0.tgz#79786d8b525e269de850ac82b1f1f757f3915f44"
+  integrity sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==
   dependencies:
     "@hono/node-server" "^1.19.9"
     ajv "^8.17.1"
@@ -1155,10 +1155,10 @@ path-key@^3.1.0:
   resolved "https://registry.yarnpkg.com/path-key/-/path-key-3.1.1.tgz#581f6ade658cbba65a0d3380de7753295054f375"
   integrity sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q==
 
-path-to-regexp@^8.0.0:
-  version "8.3.0"
-  resolved "https://registry.yarnpkg.com/path-to-regexp/-/path-to-regexp-8.3.0.tgz#aa818a6981f99321003a08987d3cec9c3474cd1f"
-  integrity sha512-7jdwVIRtsP8MYpdXSwOS0YdD0Du+qOoF/AEPIt88PcCFrZCzx41oxku1jD88hZBwbNUIEfpqvuhjFaMAqMTWnA==
+path-to-regexp@^8.0.0, path-to-regexp@^8.4.0:
+  version "8.4.2"
+  resolved "https://registry.yarnpkg.com/path-to-regexp/-/path-to-regexp-8.4.2.tgz#795c420c4f7ca45c5b887366f622ee0c9852cccd"
+  integrity sha512-qRcuIdP69NPm4qbACK+aDogI5CBDMi1jKe0ry5rSQJz8JVLsC7jV8XpiJjGRLLol3N+R5ihGYcrPLTno6pAdBA==
 
 pkce-challenge@^5.0.0:
   version "5.0.1"
@@ -1413,10 +1413,10 @@ socket.io-client@^4.8.3:
     engine.io-client "~6.6.1"
     socket.io-parser "~4.2.4"
 
-socket.io-parser@~4.2.4:
-  version "4.2.5"
-  resolved "https://registry.yarnpkg.com/socket.io-parser/-/socket.io-parser-4.2.5.tgz#3f41b8d369129a93268f2abecba94b5292850099"
-  integrity sha512-bPMmpy/5WWKHea5Y/jYAP6k74A+hvmRCQaJuJB6I/ML5JZq/KfNieUVo/3Mh7SAqn7TyFdIo6wqYHInG1MU1bQ==
+socket.io-parser@^4.2.6, socket.io-parser@~4.2.4:
+  version "4.2.6"
+  resolved "https://registry.yarnpkg.com/socket.io-parser/-/socket.io-parser-4.2.6.tgz#19156bf179af3931abd05260cfb1491822578a6f"
+  integrity sha512-asJqbVBDsBCJx0pTqw3WfesSY0iRX+2xzWEWzrpcH7L6fLzrhyF8WPI8UaeM4YCuDfpwA/cgsdugMsmtz8EJeg==
   dependencies:
     "@socket.io/component-emitter" "~3.1.0"
     debug "~4.4.1"
