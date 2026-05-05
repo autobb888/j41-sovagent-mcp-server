@@ -39,6 +39,38 @@ let pendingKeypair: { wif: string; pubkey: string; address: string; network: 've
 let cachedAllowlist: FinancialAllowlist | null = null;
 const rateLimiter = new RateLimiter();
 
+// ── Active job context ──
+// Set when this agent accepts a job (as seller); cleared on
+// complete/cancel/dispute/end_session. Payment tools fall back to this
+// when the caller doesn't pass an explicit jobId — useful for multi-step
+// LLM tool use where the model already accepted a job and now wants to
+// record/send/refund without re-stating the jobId.
+export interface ActiveJob {
+  jobId: string;
+  jobHash: string | null;
+  amount: number;
+  currency: string;
+  buyerVerusId: string | null;
+  acceptedAt: number; // unix ms
+}
+let activeJob: ActiveJob | null = null;
+
+export function setActiveJob(job: ActiveJob): void {
+  activeJob = job;
+}
+
+export function getActiveJob(): ActiveJob | null {
+  return activeJob;
+}
+
+export function clearActiveJob(jobId: string): void {
+  // Only clear if it matches — otherwise an out-of-order
+  // complete_job for an old job could nuke the wrong context.
+  if (activeJob && activeJob.jobId === jobId) {
+    activeJob = null;
+  }
+}
+
 export function setPendingKeypair(kp: { wif: string; pubkey: string; address: string; network: 'verus' | 'verustest' }): void {
   pendingKeypair = kp;
 }
@@ -66,6 +98,7 @@ export function resetAgent(): void {
   storedWif = null;
   pendingKeypair = null;
   cachedAllowlist = null;
+  activeJob = null;
 }
 
 export function initAgent(config: {

@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { checkForCanaryLeak } from '@junction41/sovagent-sdk';
-import { getAgent, requireState, signWithAgent, AgentState, getAllowlist, getRateLimiter, reloadAllowlist } from '../state.js';
+import { getAgent, requireState, signWithAgent, AgentState, getAllowlist, getRateLimiter, reloadAllowlist, setActiveJob, clearActiveJob } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 import { checkFinancialOp, logBlockedOperation, addActiveJobAddress, removeActiveJobAddress, getAllowlistPath } from '../allowlist.js';
@@ -68,6 +68,16 @@ export function registerJobTools(server: McpServer): void {
         const message = `J41-ACCEPT|Job:${jobDetails.jobHash}|Buyer:${jobDetails.buyerVerusId}|Amt:${jobDetails.amount} ${jobDetails.currency}|Ts:${timestamp}|I accept this job and commit to delivering the work.`;
         const signature = signWithAgent(message);
         const job = await agent.client.acceptJob(jobId, signature, timestamp);
+
+        // ── Active-job context: payment tools default to this jobId/price ──
+        setActiveJob({
+          jobId,
+          jobHash: jobDetails.jobHash ?? null,
+          amount: Number(jobDetails.amount) || 0,
+          currency: jobDetails.currency || 'VRSCTEST',
+          buyerVerusId: jobDetails.buyerVerusId ?? null,
+          acceptedAt: Date.now(),
+        });
 
         // ── Allowlist lifecycle: add buyer refund address ──
         const buyerAddress = jobDetails.buyerPayAddress || jobDetails.buyer?.payAddress;
@@ -142,6 +152,9 @@ export function registerJobTools(server: McpServer): void {
         const signature = signWithAgent(message);
         const job = await agent.client.completeJob(jobId, signature, timestamp);
 
+        // ── Active-job context: clear ──
+        clearActiveJob(jobId);
+
         // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
         removeActiveJobAddress(getAllowlistPath(), jobId);
         getRateLimiter().clearJob(jobId);
@@ -166,6 +179,9 @@ export function registerJobTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
         const job = await agent.client.cancelJob(jobId);
+
+        // ── Active-job context: clear ──
+        clearActiveJob(jobId);
 
         // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
         removeActiveJobAddress(getAllowlistPath(), jobId);
@@ -251,6 +267,9 @@ export function registerJobTools(server: McpServer): void {
           `/v1/jobs/${encodeURIComponent(jobId)}/end-session`,
         );
 
+        // ── Active-job context: clear ──
+        clearActiveJob(jobId);
+
         // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
         removeActiveJobAddress(getAllowlistPath(), jobId);
         getRateLimiter().clearJob(jobId);
@@ -308,6 +327,10 @@ export function registerJobTools(server: McpServer): void {
         const message = `J41-DISPUTE|Job:${jobHash}|Reason:${reason}|Ts:${timestamp}|I am raising a dispute on this job.`;
         const signature = signWithAgent(message);
         const job = await agent.client.disputeJob(jobId, reason, signature, timestamp);
+
+        // ── Active-job context: clear ──
+        clearActiveJob(jobId);
+
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(job, null, 2) }],
         };

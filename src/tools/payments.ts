@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { getAgent, requireState, getIdentityInfo, AgentState, getAllowlist, getRateLimiter } from '../state.js';
+import { getAgent, requireState, getIdentityInfo, AgentState, getAllowlist, getRateLimiter, getActiveJob } from '../state.js';
 import { errorResult } from './error.js';
 import { checkFinancialOp, logBlockedOperation } from '../allowlist.js';
 
@@ -226,8 +226,13 @@ export function registerPaymentTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
 
         // ── Allowlist + rate limit gate ──
-        const jobId = '_standalone';
-        const jobPrice = Infinity;
+        // Use active-job context when available so the per-job price ceiling
+        // and rate-limit bucket apply correctly. Without it the gate falls
+        // back to '_standalone' with an unbounded price ceiling — fine for
+        // ad-hoc sends, but loses protection during accepted jobs.
+        const active = getActiveJob();
+        const jobId = active?.jobId ?? '_standalone';
+        const jobPrice = active?.amount ?? Infinity;
         const gate = checkFinancialOp(to, amount, jobId, jobPrice, getAllowlist(), getRateLimiter());
         if (!gate.allowed) {
           logBlockedOperation('j41_send_currency', to, amount, jobId, gate.reason!);
