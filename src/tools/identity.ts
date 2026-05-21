@@ -4,6 +4,18 @@ import { generateKeypair } from '@junction41/sovagent-sdk';
 import { signWithAgent, setPendingKeypair } from '../state.js';
 import { errorResult } from './error.js';
 
+// Reserved namespace for J41 protocol messages (job lifecycle, payments,
+// deposits, access envelopes, bounties, status, etc.). The generic signing
+// tools must NOT mint signatures over these — those messages are signed only by
+// their dedicated, gated tools. Otherwise a prompt-injected agent could forge a
+// protocol-format signature (e.g. an accept/deposit/access attestation) and
+// bypass the gating. Matched case-insensitively after trimming leading space.
+export function assertNotProtocolMessage(text: string): void {
+  if (/^\s*j41-/i.test(text)) {
+    throw new Error('Refusing to sign a J41-protocol-formatted message via the generic signer. Use the dedicated tool for this action (e.g. j41_accept_job, j41_send_currency).');
+  }
+}
+
 export function registerIdentityTools(server: McpServer): void {
   server.tool(
     'j41_generate_keypair',
@@ -32,12 +44,13 @@ export function registerIdentityTools(server: McpServer): void {
 
   server.tool(
     'j41_sign_message',
-    'Sign an arbitrary message using the stored key.',
+    'Sign an arbitrary message using the stored key. Cannot sign J41-protocol-formatted messages (use the dedicated tool for those).',
     {
       message: z.string().min(1).describe('Message to sign'),
     },
     async ({ message }) => {
       try {
+        assertNotProtocolMessage(message);
         const signature = signWithAgent(message);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ signature }) }],
@@ -56,6 +69,7 @@ export function registerIdentityTools(server: McpServer): void {
     },
     async ({ challenge }) => {
       try {
+        assertNotProtocolMessage(challenge);
         const signature = signWithAgent(challenge);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ signature }) }],

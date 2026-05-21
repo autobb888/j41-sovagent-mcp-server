@@ -6,6 +6,7 @@ import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 import { checkFinancialOp, logBlockedOperation, addActiveJobAddress, removeActiveJobAddress, getAllowlistPath } from '../allowlist.js';
 import { getCanaryToken } from './safety.js';
+import { resolveDestination } from './payments.js';
 
 const JOB_STATUS = z.enum([
   'requested', 'accepted', 'in_progress', 'delivered',
@@ -228,6 +229,12 @@ export function registerJobTools(server: McpServer): void {
         const jobResult = result as any;
 
         // ── Allowlist lifecycle: add seller payment address + platform fee ──
+        // SECURITY: only ever allowlist addresses returned by the trusted
+        // platform API for this job. The agent-supplied `sellerVerusId` is
+        // NEVER added here — doing so would let a prompt-injected agent
+        // self-authorize an arbitrary payout destination and drain the wallet.
+        // If payment legitimately routes to the seller's identity, the platform
+        // returns that address in `payment.address`.
         const jobData = jobResult?.data || jobResult;
         const sellerPayAddr = jobData?.payment?.address;
         const platformFeeAddr = jobData?.payment?.platformFeeAddress;
@@ -237,12 +244,12 @@ export function registerJobTools(server: McpServer): void {
         if (platformFeeAddr) {
           addActiveJobAddress(getAllowlistPath(), `fee-${jobData.id || 'unknown'}`, platformFeeAddr);
         }
-        // Also add the sellerVerusId (i-address) in case payment routes there
-        if (sellerVerusId) {
-          addActiveJobAddress(getAllowlistPath(), `seller-${jobData.id || 'unknown'}`, sellerVerusId);
-        }
         reloadAllowlist();
-        console.error(`[allowlist] Added seller ${sellerPayAddr || sellerVerusId} for job ${jobData.id}`);
+        if (sellerPayAddr) {
+          console.error(`[allowlist] Added platform-confirmed seller address ${sellerPayAddr} for job ${jobData.id}`);
+        } else {
+          console.error(`[allowlist] No platform pay address returned for job ${jobData.id} — nothing allowlisted (sends will be blocked until an address is confirmed)`);
+        }
 
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
@@ -412,16 +419,29 @@ export function registerJobTools(server: McpServer): void {
     async ({ outputs }) => {
       try {
         requireState(AgentState.Authenticated);
+        const agent = getAgent();
+
+        // ── Resolve every destination BEFORE gating ──
+        // Resolve VerusIDs to canonical pay addresses so the gate checks (and
+        // the SDK sends to) the value actually funded. Fails closed on any
+        // unresolvable destination.
+        const resolvedOutputs: Array<{ address: string; amount: number; candidates: string[] }> = [];
+        for (const output of outputs) {
+          const { resolved, candidates } = await resolveDestination(agent, output.address);
+          resolvedOutputs.push({ address: resolved, amount: output.amount, candidates });
+        }
 
         // ── Allowlist gate: check EVERY output address ──
+        // The per-job price ceiling is unbounded here ('_standalone'), but the
+        // absolute per-send/per-day caps in checkSend bound the total spend.
         const allowlist = getAllowlist();
         const limiter = getRateLimiter();
-        const total = outputs.reduce((s: number, o: { amount: number }) => s + o.amount, 0);
+        const total = resolvedOutputs.reduce((s, o) => s + o.amount, 0);
         const jobId = '_standalone';
         const jobPrice = Infinity;
 
-        for (const output of outputs) {
-          const gate = checkFinancialOp(output.address, output.amount, jobId, jobPrice, allowlist, limiter);
+        for (const output of resolvedOutputs) {
+          const gate = checkFinancialOp(output.candidates, output.amount, jobId, jobPrice, allowlist, limiter);
           if (!gate.allowed) {
             logBlockedOperation('j41_send_multi_payment', output.address, output.amount, jobId, gate.reason!);
             return {
@@ -434,8 +454,9 @@ export function registerJobTools(server: McpServer): void {
           }
         }
 
-        const agent = getAgent();
-        const txid = await agent.sendMultiPayment(outputs);
+        const txid = await agent.sendMultiPayment(
+          resolvedOutputs.map((o) => ({ address: o.address, amount: o.amount })),
+        );
 
         // Record the full send
         limiter.recordSend(jobId, total);

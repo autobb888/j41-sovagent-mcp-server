@@ -4,6 +4,31 @@ import { getAgent, requireState, getIdentityInfo, AgentState, getAllowlist, getR
 import { errorResult } from './error.js';
 import { checkFinancialOp, logBlockedOperation } from '../allowlist.js';
 
+/**
+ * Resolve a destination to the canonical address that funds will actually go
+ * to, BEFORE the allowlist gate runs. R-/i-addresses are already canonical;
+ * VerusIDs (containing '@' or '.') are resolved via the trusted platform.
+ *
+ * Returns the resolved address (to hand to the SDK so it does not re-resolve
+ * to a different value) plus all equivalent candidate forms to check against
+ * the allowlist. Throws (fail-closed) if a VerusID cannot be resolved — an
+ * unverifiable destination must never be sent to.
+ */
+export async function resolveDestination(
+  agent: { client: { getAgentPaymentAddress(id: string): Promise<{ address?: string }> } },
+  to: string,
+): Promise<{ resolved: string; candidates: string[] }> {
+  if (!to.includes('@') && !to.includes('.')) {
+    return { resolved: to, candidates: [to] };
+  }
+  const payInfo = await agent.client.getAgentPaymentAddress(to);
+  const resolved = payInfo?.address;
+  if (!resolved) {
+    throw new Error(`Could not resolve destination "${to}" to a pay address — refusing to send to an unverifiable target`);
+  }
+  return { resolved, candidates: [resolved, to] };
+}
+
 export function registerPaymentTools(server: McpServer): void {
   server.tool(
     'j41_get_chain_info',
@@ -82,9 +107,26 @@ export function registerPaymentTools(server: McpServer): void {
           throw new Error('Invalid rawhex — must contain only hexadecimal characters');
         }
 
+        // ── Allowlist bypass guard ──
+        // A raw signed tx has an arbitrary, unparseable destination, so the
+        // financial allowlist CANNOT gate it. Disabled by default to close the
+        // bypass — legitimate sends go through j41_send_currency /
+        // j41_send_multi_payment, which build, sign, and broadcast through the
+        // gated path. Operators who genuinely need external tx construction set
+        // J41_ALLOW_RAW_BROADCAST=1.
+        if (process.env.J41_ALLOW_RAW_BROADCAST !== '1') {
+          const reason = 'Raw broadcast is disabled (cannot be allowlist-gated). Use j41_send_currency/j41_send_multi_payment, or set J41_ALLOW_RAW_BROADCAST=1 to opt in.';
+          logBlockedOperation('j41_broadcast_tx', 'unknown(rawhex)', 0, '_broadcast', reason);
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({
+              error: reason,
+              code: 'FINANCIAL_OP_BLOCKED',
+            }) }],
+            isError: true,
+          };
+        }
+
         // ── Global suspension check for broadcast ──
-        // We cannot reliably parse destination from raw hex without a full tx
-        // deserializer. But we CAN block broadcasts when globally suspended.
         const limiter = getRateLimiter();
         if (limiter.isSuspended()) {
           const reason = 'Financial operations suspended — broadcast_tx blocked';
@@ -224,18 +266,25 @@ export function registerPaymentTools(server: McpServer): void {
     async ({ to, amount, sourceAddress, changeAddress }) => {
       try {
         requireState(AgentState.Authenticated);
+        const agent = getAgent();
+
+        // ── Resolve destination BEFORE gating ──
+        // A VerusID is resolved to the canonical pay address the SDK would send
+        // to, so the gate checks the value actually funded (not the friendly
+        // name). Fails closed if the destination cannot be resolved.
+        const { resolved, candidates } = await resolveDestination(agent, to);
 
         // ── Allowlist + rate limit gate ──
         // Use active-job context when available so the per-job price ceiling
-        // and rate-limit bucket apply correctly. Without it the gate falls
-        // back to '_standalone' with an unbounded price ceiling — fine for
-        // ad-hoc sends, but loses protection during accepted jobs.
+        // and rate-limit bucket apply correctly. Without it the gate falls back
+        // to '_standalone'; the per-job price ceiling is then unbounded but the
+        // absolute per-send/per-day caps in checkSend still bound every send.
         const active = getActiveJob();
         const jobId = active?.jobId ?? '_standalone';
         const jobPrice = active?.amount ?? Infinity;
-        const gate = checkFinancialOp(to, amount, jobId, jobPrice, getAllowlist(), getRateLimiter());
+        const gate = checkFinancialOp(candidates, amount, jobId, jobPrice, getAllowlist(), getRateLimiter());
         if (!gate.allowed) {
-          logBlockedOperation('j41_send_currency', to, amount, jobId, gate.reason!);
+          logBlockedOperation('j41_send_currency', resolved, amount, jobId, gate.reason!);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify({
               error: gate.reason,
@@ -245,11 +294,12 @@ export function registerPaymentTools(server: McpServer): void {
           };
         }
 
-        const agent = getAgent();
         const opts: any = {};
         if (sourceAddress) opts.sourceAddress = sourceAddress;
         if (changeAddress) opts.changeAddress = changeAddress;
-        const txid = await agent.sendCurrency(to, amount, Object.keys(opts).length > 0 ? opts : undefined);
+        // Send to the already-resolved address so the SDK cannot re-resolve to
+        // a different target than the one we gated.
+        const txid = await agent.sendCurrency(resolved, amount, Object.keys(opts).length > 0 ? opts : undefined);
 
         // Record successful send for rate limiting
         getRateLimiter().recordSend(jobId, amount);
