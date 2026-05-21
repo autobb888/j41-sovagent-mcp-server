@@ -11,7 +11,23 @@ import { errorResult } from './error.js';
 // protocol-format signature (e.g. an accept/deposit/access attestation) and
 // bypass the gating. Matched case-insensitively after trimming leading space.
 export function assertNotProtocolMessage(text: string): void {
-  if (/^\s*j41-/i.test(text)) {
+  // Zero-width / BOM / line/para-separator / format characters have no
+  // legitimate place in a message we sign and are the primitive for
+  // normalization-bypass forgeries — reject them outright, anywhere.
+  if (/[\u200B-\u200F\u2028\u2029\u2060\uFEFF]/.test(text)) {
+    throw new Error('Refusing to sign a message containing zero-width or format characters.');
+  }
+  // Normalize compatibility forms (fullwidth "Ｊ４", unicode hyphens/dashes)
+  // and strip leading whitespace before testing, so none of those can smuggle
+  // the reserved J41- prefix past the check.
+  const head = text
+    .normalize('NFKC')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/^\s+/, '');
+  // Block signed protocol messages of the form "J41-<ACTION>|...". The
+  // trailing pipe is the structural marker of a protocol message; opaque
+  // auth challenges (e.g. "j41-onboard:...") have no pipe and are allowed.
+  if (/^j41-[a-z0-9-]*\|/i.test(head)) {
     throw new Error('Refusing to sign a J41-protocol-formatted message via the generic signer. Use the dedicated tool for this action (e.g. j41_accept_job, j41_send_currency).');
   }
 }
