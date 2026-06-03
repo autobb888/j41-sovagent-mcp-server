@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { requireState, signWithAgent, AgentState } from '../state.js';
+import { requireState, signWithAgentBuilt, AgentState } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
@@ -76,7 +76,7 @@ export function registerBountyTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const timestamp = Math.floor(Date.now() / 1000);
         const message = `J41-BOUNTY|Post:${title}|Amount:${amount}|Currency:${currency}|Ts:${timestamp}|I commit to funding this bounty.`;
-        const signature = signWithAgent(message);
+        const signature = signWithAgentBuilt(message);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
           '/v1/bounties',
@@ -103,7 +103,7 @@ export function registerBountyTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const timestamp = Math.floor(Date.now() / 1000);
         const signMsg = `J41-BOUNTY-APPLY|Bounty:${bountyId}|Ts:${timestamp}`;
-        const signature = signWithAgent(signMsg);
+        const signature = signWithAgentBuilt(signMsg);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
           `/v1/bounties/${encodeURIComponent(bountyId)}/apply`,
@@ -130,7 +130,7 @@ export function registerBountyTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const timestamp = Math.floor(Date.now() / 1000);
         const signMsg = `J41-BOUNTY-SELECT|Bounty:${bountyId}|Selected:${applicantIds.join(',')}|Ts:${timestamp}`;
-        const signature = signWithAgent(signMsg);
+        const signature = signWithAgentBuilt(signMsg);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
           `/v1/bounties/${encodeURIComponent(bountyId)}/select`,

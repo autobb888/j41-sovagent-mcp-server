@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { checkForCanaryLeak } from '@junction41/sovagent-sdk';
-import { getAgent, requireState, signWithAgent, AgentState, getAllowlist, getRateLimiter, reloadAllowlist } from '../state.js';
+import { getAgent, requireState, signWithAgentBuilt, AgentState, getAllowlist, getRateLimiter, reloadAllowlist } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 import { checkFinancialOp, logBlockedOperation, addActiveJobAddress, removeActiveJobAddress, getAllowlistPath } from '../allowlist.js';
@@ -66,7 +66,7 @@ export function registerJobTools(server: McpServer): void {
         const jobDetails = await agent.client.getJob(jobId);
         const timestamp = Math.floor(Date.now() / 1000);
         const message = `J41-ACCEPT|Job:${jobDetails.jobHash}|Buyer:${jobDetails.buyerVerusId}|Amt:${jobDetails.amount} ${jobDetails.currency}|Ts:${timestamp}|I accept this job and commit to delivering the work.`;
-        const signature = signWithAgent(message);
+        const signature = signWithAgentBuilt(message);
         const job = await agent.client.acceptJob(jobId, signature, timestamp);
 
         // ── Allowlist lifecycle: add buyer refund address ──
@@ -115,7 +115,7 @@ export function registerJobTools(server: McpServer): void {
         const { createHash } = await import('crypto');
         const deliveryHash = createHash('sha256').update(deliveryContent).digest('hex');
         const message = `J41-DELIVER|Job:${jobDetails.jobHash}|Delivery:${deliveryHash}|Ts:${timestamp}|I have delivered the work for this job.`;
-        const signature = signWithAgent(message);
+        const signature = signWithAgentBuilt(message);
         const job = await agent.client.deliverJob(jobId, deliveryHash, signature, timestamp, deliveryMessage);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(job, null, 2) }],
@@ -139,7 +139,7 @@ export function registerJobTools(server: McpServer): void {
         const jobHash = jobData.data.jobHash;
         const timestamp = Math.floor(Date.now() / 1000);
         const message = `J41-COMPLETE|Job:${jobHash}|Ts:${timestamp}|I confirm the work has been delivered satisfactorily.`;
-        const signature = signWithAgent(message);
+        const signature = signWithAgentBuilt(message);
         const job = await agent.client.completeJob(jobId, signature, timestamp);
 
         // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
@@ -306,7 +306,7 @@ export function registerJobTools(server: McpServer): void {
         const jobHash = jobData.data.jobHash;
         const timestamp = Math.floor(Date.now() / 1000);
         const message = `J41-DISPUTE|Job:${jobHash}|Reason:${reason}|Ts:${timestamp}|I am raising a dispute on this job.`;
-        const signature = signWithAgent(message);
+        const signature = signWithAgentBuilt(message);
         const job = await agent.client.disputeJob(jobId, reason, signature, timestamp);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(job, null, 2) }],

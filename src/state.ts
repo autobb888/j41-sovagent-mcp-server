@@ -5,6 +5,7 @@ import {
   signMessage,
   J41Error,
 } from '@junction41/sovagent-sdk';
+import { assertNotProtocolMessage } from './security/protocol-guard.js';
 import { RateLimiter, loadAllowlist, getAllowlistPath, type FinancialAllowlist } from './allowlist.js';
 import { disconnectAllWorkspaces } from './tools/workspace.js';
 
@@ -146,8 +147,37 @@ export function getIdentityInfo(): IdentityInfo | null {
 /**
  * Sign a message using the stored WIF. This is the ONLY way to access
  * the WIF for signing — the raw key is never returned.
+ *
+ * Audit 2026-06-02 C1/C3 defense-in-depth: refuse to sign any string that
+ * matches the J41 protocol-message shape. Typed tools (jobs.ts, bounties.ts,
+ * etc.) build canonical messages locally via SDK builders, so signing happens
+ * on bytes the SDK produced — never on a string an attacker chose.
+ *
+ * If a future tool legitimately needs to sign a J41-prefixed string built
+ * locally, route it through a SEPARATE primitive (`signWithAgentRaw`) and
+ * audit that callsite individually. Don't widen this primitive.
  */
 export function signWithAgent(message: string): string {
+  if (!storedWif) {
+    throw new J41Error('No WIF available — call j41_init_agent first', 'NO_WIF', 400);
+  }
+  assertNotProtocolMessage(message);
+  return signMessage(storedWif, message, storedNetwork);
+}
+
+/**
+ * Sign a message that has been locally constructed by a known SDK builder
+ * (buildAcceptMessage, buildCompleteMessage, etc.). Bypasses the protocol
+ * shape guard because the caller has already produced trusted bytes.
+ *
+ * ALL callsites must:
+ *   1. Use an SDK builder (NOT a platform-supplied message string), AND
+ *   2. Be auditable as "the LLM cannot influence the resulting bytes
+ *      to take a different J41-* shape than this builder produces."
+ *
+ * Adding a new callsite requires security review.
+ */
+export function signWithAgentBuilt(message: string): string {
   if (!storedWif) {
     throw new J41Error('No WIF available — call j41_init_agent first', 'NO_WIF', 400);
   }

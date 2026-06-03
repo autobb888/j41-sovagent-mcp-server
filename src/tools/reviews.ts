@@ -1,8 +1,38 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { requireState, signWithAgent, AgentState, getIdentityInfo } from '../state.js';
+import { requireState, signWithAgentBuilt, AgentState, getIdentityInfo } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
+
+// Audit 2026-06-02 H-MCP-funds-2 confused-deputy: `j41_submit_review` used to
+// blind-sign the message returned by GET /v1/reviews/message, letting a
+// compromised/MITM'd platform substitute an arbitrary protocol message and
+// harvest a signature usable elsewhere (J41-COMPLETE, J41-DEPOSIT-REPORT...).
+// The full fix is in the SDK (build the canonical message locally — see SDK
+// audit chunk-2 H1/H10). Until then, we enforce that the platform-supplied
+// message starts with `J41-REVIEW|` and embeds the jobHash + rating we asked
+// to sign — so the attacker can at best mint a review-shaped signature over
+// our own review payload, not a fund-loss-shaped one.
+function assertReviewMessageShape(
+  msg: string,
+  expected: { jobHash: string; rating: number },
+): void {
+  if (typeof msg !== 'string' || !msg.startsWith('J41-REVIEW|')) {
+    throw new Error(
+      'Platform-supplied review-signing message is not J41-REVIEW-shaped — refusing to sign',
+    );
+  }
+  if (!msg.includes(`Job:${expected.jobHash}`)) {
+    throw new Error(
+      'Platform-supplied review-signing message does not bind our jobHash — refusing to sign',
+    );
+  }
+  if (!msg.includes(`Rating:${expected.rating}`)) {
+    throw new Error(
+      'Platform-supplied review-signing message does not bind our rating — refusing to sign',
+    );
+  }
+}
 
 export function registerReviewTools(server: McpServer): void {
   server.tool(
@@ -55,8 +85,9 @@ export function registerReviewTools(server: McpServer): void {
           `/v1/reviews/message?${params}`,
         );
 
-        // Step 2: Sign the message
-        const signature = signWithAgent(msgResult.data.message);
+        // Step 2: Verify the platform-supplied message shape, then sign
+        assertReviewMessageShape(msgResult.data.message, { jobHash, rating });
+        const signature = signWithAgentBuilt(msgResult.data.message);
 
         // Step 3: Submit the review
         const result = await apiRequest<{ data: unknown }>(

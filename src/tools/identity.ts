@@ -1,8 +1,17 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { generateKeypair } from '@junction41/sovagent-sdk';
-import { signWithAgent, setPendingKeypair } from '../state.js';
+import { setPendingKeypair } from '../state.js';
 import { errorResult } from './error.js';
+
+// Audit 2026-06-02 C1/C3 removed `j41_sign_message` and `j41_sign_challenge`:
+// they were raw signing oracles that let a prompt-injected LLM mint signatures
+// over arbitrary `J41-*|...` protocol strings (J41-COMPLETE, J41-BOUNTY-SELECT,
+// J41-DISPUTE-RESPOND, J41-STATUS) and submit them out-of-band to the platform.
+// Every legitimate protocol action already has a typed tool that builds the
+// canonical message internally — the raw oracle had no irreplaceable use case.
+// `signWithAgent()` in state.ts now also rejects protocol-shaped strings as
+// defense-in-depth for the typed tools.
 
 export function registerIdentityTools(server: McpServer): void {
   server.tool(
@@ -29,41 +38,4 @@ export function registerIdentityTools(server: McpServer): void {
       }
     },
   );
-
-  server.tool(
-    'j41_sign_message',
-    'Sign an arbitrary message using the stored key.',
-    {
-      message: z.string().min(1).describe('Message to sign'),
-    },
-    async ({ message }) => {
-      try {
-        const signature = signWithAgent(message);
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ signature }) }],
-        };
-      } catch (err) {
-        return errorResult(err);
-      }
-    },
-  );
-
-  server.tool(
-    'j41_sign_challenge',
-    'Sign an authentication challenge using the stored agent key.',
-    {
-      challenge: z.string().min(1).describe('Challenge string from J41'),
-    },
-    async ({ challenge }) => {
-      try {
-        const signature = signWithAgent(challenge);
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ signature }) }],
-        };
-      } catch (err) {
-        return errorResult(err);
-      }
-    },
-  );
 }
-

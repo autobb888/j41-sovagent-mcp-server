@@ -214,21 +214,40 @@ export function registerPaymentTools(server: McpServer): void {
 
   server.tool(
     'j41_send_currency',
-    'Send VRSC/VRSCTEST to an R-address, i-address, or VerusID. Builds, signs, and broadcasts the transaction.',
+    'Send VRSC/VRSCTEST to an R-address, i-address, or VerusID. Builds, signs, and broadcasts the transaction. ' +
+    'Per audit 2026-06-02 C2, the `changeAddress` and `sourceAddress` parameters were removed — they bypassed ' +
+    'the financial allowlist (sending dust to an allowlisted addr while routing the entire UTXO change to an attacker). ' +
+    'The SDK defaults change to the agent\'s own R-address.',
     {
       to: z.string().min(1).describe('Destination: R-address, i-address, or VerusID (e.g. "alice@")'),
       amount: z.coerce.number().positive().describe('Amount in VRSC (not satoshis)'),
-      sourceAddress: z.string().optional().describe('Only spend UTXOs from this address (i-address or R-address)'),
-      changeAddress: z.string().optional().describe('Send change to this address instead of default'),
+      // sourceAddress + changeAddress intentionally removed (Audit 2026-06-02 C2).
+      // If a future use case requires them, they MUST be allowlist-validated below.
     },
-    async ({ to, amount, sourceAddress, changeAddress }) => {
+    async ({ to, amount }) => {
       try {
         requireState(AgentState.Authenticated);
 
         // ── Allowlist + rate limit gate ──
+        // Audit 2026-06-02 H-MCP-funds-1: jobPrice=Infinity silently disabled the
+        // total-value cap (`1.1 * Infinity = Infinity`). Use a finite per-call cap.
         const jobId = '_standalone';
-        const jobPrice = Infinity;
-        const gate = checkFinancialOp(to, amount, jobId, jobPrice, getAllowlist(), getRateLimiter());
+        const STANDALONE_MAX_VALUE_VRSC = Number(process.env.J41_MCP_STANDALONE_MAX_VRSC ?? '10');
+        if (!Number.isFinite(STANDALONE_MAX_VALUE_VRSC) || STANDALONE_MAX_VALUE_VRSC <= 0) {
+          throw new Error('J41_MCP_STANDALONE_MAX_VRSC must be a positive finite number');
+        }
+        if (amount > STANDALONE_MAX_VALUE_VRSC) {
+          const reason = `BLOCKED: standalone send amount ${amount} exceeds cap ${STANDALONE_MAX_VALUE_VRSC} VRSC (set J41_MCP_STANDALONE_MAX_VRSC to raise)`;
+          logBlockedOperation('j41_send_currency', to, amount, jobId, reason);
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({
+              error: reason,
+              code: 'FINANCIAL_OP_BLOCKED',
+            }) }],
+            isError: true,
+          };
+        }
+        const gate = checkFinancialOp(to, amount, jobId, STANDALONE_MAX_VALUE_VRSC, getAllowlist(), getRateLimiter());
         if (!gate.allowed) {
           logBlockedOperation('j41_send_currency', to, amount, jobId, gate.reason!);
           return {
@@ -241,10 +260,10 @@ export function registerPaymentTools(server: McpServer): void {
         }
 
         const agent = getAgent();
-        const opts: any = {};
-        if (sourceAddress) opts.sourceAddress = sourceAddress;
-        if (changeAddress) opts.changeAddress = changeAddress;
-        const txid = await agent.sendCurrency(to, amount, Object.keys(opts).length > 0 ? opts : undefined);
+        // SDK uses agent's own R-address as default change destination — no
+        // operator/LLM override here. If the caller needs custom source/change
+        // addresses, they should drive the SDK directly with explicit auditing.
+        const txid = await agent.sendCurrency(to, amount);
 
         // Record successful send for rate limiting
         getRateLimiter().recordSend(jobId, amount);

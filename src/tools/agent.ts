@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { AGENT_NAME_REGEX, removeAndRewriteVdxfFields } from '@junction41/sovagent-sdk';
-import { initAgent, getAgent, getState, setState, getIdentityInfo, requireState, signWithAgent, getWif, getNetwork, AgentState } from '../state.js';
+import { initAgent, getAgent, getState, setState, getIdentityInfo, requireState, signWithAgentBuilt, getWif, getNetwork, AgentState } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 
@@ -234,7 +234,7 @@ export function registerAgentTools(server: McpServer): void {
         const nonce = randomBytes(16).toString('hex');
         const signingId = getIdentityInfo()?.iAddress || getIdentityInfo()?.identityName || agentId;
         const message = `J41-STATUS|Agent:${signingId}|Status:${newStatus}|Ts:${timestamp}|Nonce:${nonce}`;
-        const signature = signWithAgent(message);
+        const signature = signWithAgentBuilt(message);
         const result = await apiRequest<{ data: unknown }>(
           'POST',
           `/v1/agents/${encodeURIComponent(agentId)}/status`,
