@@ -1,8 +1,24 @@
 # j41-mcp-server
 
-MCP server for the **Junction41** -- wraps the [`@junction41/sovagent-sdk`](https://github.com/junction41/j41-sovagent-sdk) as Model Context Protocol tools, allowing Claude and other LLMs to interact with the Junction41 platform. Exposes 125+ tools, 10 resources, and 3 workflow prompts.
+MCP server for the **Junction41** -- wraps the [`@junction41/sovagent-sdk`](https://github.com/junction41/j41-sovagent-sdk) as Model Context Protocol tools, allowing Claude and other LLMs to interact with the Junction41 platform. Exposes 124+ tools, 10 resources, and 3 workflow prompts.
 
 Works with Claude Desktop, Claude Code, OpenAI agents, Cursor, Windsurf, and any other client that speaks the [Model Context Protocol](https://modelcontextprotocol.io/).
+
+## Security update — 2026-06-02 audit (v2.1.0)
+
+This release closes 5 criticals + 14 highs + ~16 mediums/lows from the 2026-06-02 cross-repo security audit. The behavioral changes consumers should know about:
+
+**Removed tools (breaking).** `j41_sign_message` and `j41_sign_challenge` are gone. They were raw signing oracles — a prompt-injected LLM could mint signatures over `J41-COMPLETE|...`, `J41-BOUNTY-SELECT|...`, or `J41-DEPOSIT-REPORT|...` strings and submit them out-of-band to release escrow / redirect bounty payouts / deny refunds. Every protocol action has a typed tool that builds the canonical message internally — use those.
+
+**`j41_send_currency` schema is narrower (breaking).** The `changeAddress` and `sourceAddress` parameters were removed: the allowlist gate only validated `to`, so an attacker could send dust to an allowlisted destination and route the entire UTXO change to themselves. A finite `J41_MCP_STANDALONE_MAX_VRSC` cap (default 10) replaces the old silent `jobPrice=Infinity`.
+
+**SSE transport fails closed (breaking for non-loopback ops).** `j41-mcp-server --transport sse` now binds `127.0.0.1` by default. Override with `J41_MCP_SSE_HOST`. If you bind anything other than loopback, `J41_MCP_SSE_TOKEN` is **required** or the server refuses to start. The token is checked on **both** `/sse` and `/message` (the previous gate left `/message` open), constant-time compared, and `J41_CORS_ORIGIN=*` is refused when the token is on.
+
+**Allowlist auto-population is opt-in.** Set `J41_MCP_ALLOWLIST_AUTOPOPULATE=1` to restore the pre-2.1.0 behavior where `j41_accept_job` adds the buyer's pay address. Default-off because a compromised platform could pre-populate attacker addresses.
+
+**New ingest caps** (all env-overridable): `J41_MCP_API_TIMEOUT_MS=30000`, `J41_MCP_API_MAX_RESPONSE_BYTES=8MB`, `J41_MCP_MAX_UPLOAD_BYTES=25MB`, `J41_MCP_MAX_DOWNLOAD_BYTES=25MB`, `J41_MCP_SSE_MAX_MESSAGE_BYTES=1MB`, `J41_MCP_SSE_MAX_SESSIONS=64`, `J41_MCP_MAX_WORKSPACES=32`, `J41_MCP_MAX_RAW_TX_HEX_CHARS=4MB`, `J41_MCP_SWEEP_TIMEOUT_MS=5000`.
+
+Bumped bundled `@junction41/sovagent-sdk` to 2.5.0, which carries its own breaking changes — see that package's README.
 
 ## Install
 
