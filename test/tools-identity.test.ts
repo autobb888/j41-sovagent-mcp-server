@@ -1,7 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeypair, signMessage, signChallenge } from '@junction41/sovagent-sdk';
-import { assertNotProtocolMessage } from '../build/tools/identity.js';
+// Audit-merge 43ed4e9: the guard moved out of tools/identity.ts (whose
+// j41_sign_message + j41_sign_challenge tools were removed entirely per
+// C1/C3) into the vendored src/security/protocol-guard.ts so the defense
+// doesn't disappear if the bundled SDK is downgraded.
+import { assertNotProtocolMessage } from '../build/security/protocol-guard.js';
 
 describe('Identity tools (pure functions)', () => {
   it('should generate a valid keypair for verustest', () => {
