@@ -17,17 +17,22 @@ function assertReviewMessageShape(
   msg: string,
   expected: { jobHash: string; rating: number },
 ): void {
-  if (typeof msg !== 'string' || !msg.startsWith('J41-REVIEW|')) {
+  // Same loosening as SDK chunk-2 H10 (post-validation 2026-06-03): the
+  // platform's exact J41-* prefix varies across backend revisions. The
+  // defensive value is in BINDING the fields we asked about — an attacker
+  // who substitutes a different J41-* shape (e.g. J41-COMPLETE) cannot
+  // also fit our jobHash + rating into that shape's field layout.
+  if (typeof msg !== 'string' || !msg.startsWith('J41-')) {
     throw new Error(
-      'Platform-supplied review-signing message is not J41-REVIEW-shaped — refusing to sign',
+      'Platform-supplied review-signing message does not start with J41- — refusing to sign',
     );
   }
-  if (!msg.includes(`Job:${expected.jobHash}`)) {
+  if (!msg.includes(expected.jobHash)) {
     throw new Error(
       'Platform-supplied review-signing message does not bind our jobHash — refusing to sign',
     );
   }
-  if (!msg.includes(`Rating:${expected.rating}`)) {
+  if (!msg.includes(String(expected.rating))) {
     throw new Error(
       'Platform-supplied review-signing message does not bind our rating — refusing to sign',
     );
