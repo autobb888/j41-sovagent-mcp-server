@@ -70,11 +70,24 @@ export function registerJobTools(server: McpServer): void {
         const job = await agent.client.acceptJob(jobId, signature, timestamp);
 
         // ── Allowlist lifecycle: add buyer refund address ──
+        // Audit 2026-06-02 H-MCP-funds-3 / H-MCP-bridge-1: this auto-injects
+        // a platform-supplied address into the financial allowlist with no
+        // on-chain verification. A compromised platform can pre-populate any
+        // address it controls and turn the allowlist gate into a no-op.
+        // Gate behind explicit opt-in: operators who want the auto-injection
+        // for ergonomics set J41_MCP_ALLOWLIST_AUTOPOPULATE=1; otherwise the
+        // dispatcher daemon or operator manages the allowlist out-of-band.
+        const autoPopulate = process.env.J41_MCP_ALLOWLIST_AUTOPOPULATE === '1';
         const buyerAddress = jobDetails.buyerPayAddress || jobDetails.buyer?.payAddress;
-        if (buyerAddress) {
+        if (buyerAddress && autoPopulate) {
           addActiveJobAddress(getAllowlistPath(), jobId, buyerAddress);
           reloadAllowlist();
-          console.error(`[allowlist] Added buyer address ${buyerAddress} for job ${jobId}`);
+          console.error(`[allowlist] (autopop) Added buyer address ${buyerAddress} for job ${jobId}`);
+        } else if (buyerAddress && !autoPopulate) {
+          console.error(
+            `[allowlist] Skipping auto-add of buyer address ${buyerAddress} for job ${jobId} ` +
+            `— J41_MCP_ALLOWLIST_AUTOPOPULATE is not '1'. Add this address manually if needed.`,
+          );
         }
 
         // ── Mandatory canary: auto-enable on job accept ──

@@ -19,6 +19,19 @@ export function registerAgentTools(server: McpServer): void {
     },
     async ({ apiUrl, wif, identityName, iAddress, network }) => {
       try {
+        // Audit 2026-06-02 H-MCP-bridge-2 (low after adversarial verify):
+        // identityName + iAddress are LLM-supplied claims; the real binding to
+        // the WIF is verified at j41_authenticate time via the platform's
+        // challenge-response. Until then, this claim is purely display info.
+        // Warn loudly if one is supplied without the other, since a partial
+        // claim makes downstream "your identity is X" displays misleading.
+        if ((identityName && !iAddress) || (!identityName && iAddress)) {
+          console.error(
+            `[init_agent] WARN: identityName/iAddress partial claim ` +
+            `(identityName=${identityName ?? 'unset'}, iAddress=${iAddress ?? 'unset'}). ` +
+            `Both should be provided together; the binding to the WIF is verified at j41_authenticate.`,
+          );
+        }
         const info = initAgent({ apiUrl, wif, identityName, iAddress, network });
         return {
           content: [{
