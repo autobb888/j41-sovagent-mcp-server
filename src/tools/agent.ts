@@ -308,7 +308,8 @@ export function registerAgentTools(server: McpServer): void {
     'j41_resolve_names',
     'Resolve an array of i-addresses to their VerusID names. Requires authentication.',
     {
-      addresses: z.array(z.string().min(1)).min(1).describe('Array of i-addresses to resolve'),
+      // Audit 2026-06-02 L-MCP-ddos-1: bound input array size.
+      addresses: z.array(z.string().min(1).max(128)).min(1).max(256).describe('Array of i-addresses to resolve (max 256 per call)'),
     },
     async ({ addresses }) => {
       try {

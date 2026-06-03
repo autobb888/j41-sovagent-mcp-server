@@ -63,9 +63,31 @@ const EMPTY_ALLOWLIST: FinancialAllowlist = {
 /**
  * Get the allowlist file path. Uses J41_ALLOWLIST_PATH env var for testing,
  * otherwise defaults to ~/.j41/financial-allowlist.json.
+ *
+ * Audit 2026-06-02 L-MCP-auth-3: if the operator sets J41_ALLOWLIST_PATH,
+ * warn loudly if the resolved directory is world-writable or group-writable
+ * — a co-tenant could otherwise mutate the allowlist out from under us.
  */
+let _allowlistPathWarned = false;
 export function getAllowlistPath(): string {
-  return process.env.J41_ALLOWLIST_PATH || DEFAULT_ALLOWLIST_PATH;
+  const p = process.env.J41_ALLOWLIST_PATH || DEFAULT_ALLOWLIST_PATH;
+  if (process.env.J41_ALLOWLIST_PATH && !_allowlistPathWarned) {
+    _allowlistPathWarned = true;
+    try {
+      const dir = path.dirname(p);
+      const st = fs.statSync(dir);
+      // Mode bits: world-write = 0o002, group-write = 0o020
+      if ((st.mode & 0o022) !== 0) {
+        console.error(
+          `[allowlist] WARN: J41_ALLOWLIST_PATH directory ${dir} is group- or world-writable ` +
+          `(mode ${(st.mode & 0o777).toString(8)}). Co-tenants can mutate the allowlist.`,
+        );
+      }
+    } catch {
+      // Directory may not exist yet — loadAllowlist creates it with default mode.
+    }
+  }
+  return p;
 }
 
 /**
@@ -382,9 +404,31 @@ export async function sweepActiveJobs(
 
   let apiReachable = false;
 
+  // Audit 2026-06-02 L-MCP-ddos-3: bound the per-entry sweep with a hard
+  // timeout so a malicious/slow platform cannot stall sweep across all jobs.
+  const SWEEP_PER_JOB_TIMEOUT_MS = Number(process.env.J41_MCP_SWEEP_TIMEOUT_MS ?? 5_000);
+  const withTimeout = async <R>(p: Promise<R>): Promise<R> => {
+    let t: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        p,
+        new Promise<R>((_, reject) => {
+          t = setTimeout(
+            () => reject(new Error(`sweep per-entry timeout (${SWEEP_PER_JOB_TIMEOUT_MS} ms)`)),
+            SWEEP_PER_JOB_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } finally {
+      if (t) clearTimeout(t);
+    }
+  };
+
   for (const entry of [...list.active_jobs]) {
     try {
-      const job = await apiRequestFn<{ data: { status: string } }>('GET', `/v1/jobs/${entry.jobId}`);
+      const job = await withTimeout(
+        apiRequestFn<{ data: { status: string } }>('GET', `/v1/jobs/${entry.jobId}`),
+      );
       apiReachable = true;
 
       const activeStatuses = ['requested', 'accepted', 'in_progress', 'delivered', 'rework'];

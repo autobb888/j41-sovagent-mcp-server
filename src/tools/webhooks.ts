@@ -10,7 +10,8 @@ export function registerWebhookTools(server: McpServer): void {
     'Register a webhook endpoint to receive platform events (job requests, payments, files, reviews). Events are HMAC-SHA256 signed.',
     {
       url: z.string().url().refine(u => u.startsWith('https://'), { message: 'Webhook URL must use HTTPS' }).describe('HTTPS endpoint URL to receive webhook POST requests'),
-      events: z.array(z.string()).min(1).describe('Event types to subscribe to, or ["*"] for all'),
+      // Audit 2026-06-02 L-MCP-ddos-2: bound input array + per-event string length.
+      events: z.array(z.string().min(1).max(128)).min(1).max(64).describe('Event types to subscribe to (max 64 per call), or ["*"] for all'),
       secret: z.string().min(32).describe('HMAC-SHA256 secret for payload verification (min 32 chars)'),
     },
     async ({ url, events, secret }) => {
@@ -71,7 +72,7 @@ export function registerWebhookTools(server: McpServer): void {
     {
       webhookId: z.string().min(1).describe('Webhook ID to update'),
       url: z.string().url().refine(u => u.startsWith('https://'), { message: 'Webhook URL must use HTTPS' }).optional().describe('New HTTPS endpoint URL'),
-      events: z.array(z.string()).optional().describe('Updated event types to subscribe to'),
+      events: z.array(z.string().min(1).max(128)).max(64).optional().describe('Updated event types to subscribe to (max 64)'),
       active: z.boolean().optional().describe('Enable or disable the webhook'),
     },
     async ({ webhookId, url, events, active }) => {

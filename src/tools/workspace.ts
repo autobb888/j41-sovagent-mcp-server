@@ -15,6 +15,10 @@ import { WorkspaceClient } from '@junction41/sovagent-sdk';
 // Each job gets its own WorkspaceClient instance (NOT agent.workspace singleton).
 const workspaces = new Map<string, WorkspaceClient>();
 
+// Audit 2026-06-02 M-MCP-ddos-4: bound concurrent workspace count to prevent
+// long-running session leakage / memory growth under load.
+const MAX_WORKSPACES = Number(process.env.J41_MCP_MAX_WORKSPACES ?? 32);
+
 function getWorkspace(jobId: string): WorkspaceClient {
   const ws = workspaces.get(jobId);
   if (!ws || !ws.isConnected) {
@@ -23,10 +27,31 @@ function getWorkspace(jobId: string): WorkspaceClient {
   return ws;
 }
 
-/** Reject paths containing '..' or starting with '/' to prevent path traversal. */
+// Audit 2026-06-02 L-MCP-funds-1: path traversal previously only checked for
+// raw '..' and leading '/'. Catches mixed-case URL-encoded forms (%2e%2e,
+// %2E%2E), backslash separators (Windows), and absolute Windows paths.
 function validatePath(p: string): void {
-  if (p.includes('..') || p.startsWith('/')) {
+  if (typeof p !== 'string' || p.length === 0) {
+    throw new Error('Invalid path: empty');
+  }
+  if (p.length > 4096) {
+    throw new Error('Invalid path: exceeds 4096 chars');
+  }
+  // Decode percent-escapes so encoded traversal is caught.
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(p);
+  } catch {
+    throw new Error('Invalid path: malformed percent-encoding');
+  }
+  if (decoded !== p && (decoded.includes('..') || decoded.startsWith('/') || /^[A-Za-z]:/.test(decoded))) {
+    throw new Error('Invalid path: encoded traversal detected');
+  }
+  if (p.includes('..') || p.startsWith('/') || p.startsWith('\\') || /^[A-Za-z]:/.test(p)) {
     throw new Error('Invalid path: must be relative and cannot contain ".."');
+  }
+  if (p.includes('\0')) {
+    throw new Error('Invalid path: NUL byte');
   }
 }
 
@@ -55,6 +80,14 @@ export function registerWorkspaceTools(server: McpServer): void {
         if (workspaces.has(jobId)) {
           workspaces.get(jobId)!.disconnect();
           workspaces.delete(jobId);
+        }
+
+        // Enforce concurrent-workspace cap (M-MCP-ddos-4)
+        if (workspaces.size >= MAX_WORKSPACES) {
+          throw new Error(
+            `Too many concurrent workspaces (${workspaces.size} >= ${MAX_WORKSPACES}). ` +
+            `Disconnect an existing workspace first or raise J41_MCP_MAX_WORKSPACES.`,
+          );
         }
 
         // Create a fresh WorkspaceClient per job (not agent.workspace singleton)

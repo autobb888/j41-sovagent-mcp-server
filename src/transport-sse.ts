@@ -74,11 +74,22 @@ async function handleRequest(
   res: http.ServerResponse,
 ): Promise<void> {
   const url = new URL(req.url ?? '/', `http://localhost:${port}`);
+  void server; // intentionally retained: SSE handshake binds it below via transport
 
-  // CORS — restrict to localhost by default; override via J41_CORS_ORIGIN env.
-  // Wildcard ("*") still possible if operator explicitly sets it, but we never
-  // wildcard by default (audit LOW-MCP-bridge: default-CORS-could-be-wildcard).
-  const allowedOrigin = process.env.J41_CORS_ORIGIN ?? `http://localhost:${port}`;
+  // CORS — restrict to localhost by default. Audit 2026-06-02 L-MCP-bridge-7:
+  // refuse a configured wildcard origin combined with the SSE token gate
+  // (cross-origin readable session = token meaningless). Operator can still
+  // override to a specific origin via J41_CORS_ORIGIN.
+  const corsConfigured = process.env.J41_CORS_ORIGIN;
+  if (corsConfigured === '*' && sseToken) {
+    console.error(
+      `[SSE] WARN: J41_CORS_ORIGIN=* combined with J41_CORS_ORIGIN=* defeats the SSE token gate. ` +
+      `Falling back to http://localhost:${port}. Set a specific origin to override.`,
+    );
+  }
+  const allowedOrigin = (corsConfigured && corsConfigured !== '*')
+    ? corsConfigured
+    : `http://localhost:${port}`;
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-mcp-token');

@@ -71,15 +71,24 @@ export function registerPaymentTools(server: McpServer): void {
     },
   );
 
+  // Audit 2026-06-02 M-MCP-funds-1 / M-MCP-ddos-3: cap raw tx hex size at a
+  // sane default. A 1 MB hex blob = 500 KB binary tx — well above any sensible
+  // Verus tx. The 4 MB hard cap is loose enough for multi-output batched txs
+  // (which the operator can override via env if they actually need it).
+  const MAX_RAW_TX_HEX_CHARS = Number(process.env.J41_MCP_MAX_RAW_TX_HEX_CHARS ?? 4 * 1024 * 1024);
+
   server.tool(
     'j41_broadcast_tx',
-    'Broadcast a raw signed transaction to the Verus network.',
-    { rawhex: z.string().min(1).describe('Raw hex-encoded signed transaction') },
+    'Broadcast a raw signed transaction to the Verus network. Per audit, the rawhex string is bounded; full destination/value introspection is delegated to the upstream RPC.',
+    { rawhex: z.string().min(1).max(MAX_RAW_TX_HEX_CHARS).describe('Raw hex-encoded signed transaction') },
     async ({ rawhex }) => {
       try {
         requireState(AgentState.Authenticated);
         if (!/^[0-9a-fA-F]+$/.test(rawhex)) {
           throw new Error('Invalid rawhex — must contain only hexadecimal characters');
+        }
+        if (rawhex.length % 2 !== 0) {
+          throw new Error('Invalid rawhex — odd-length string is not a valid byte sequence');
         }
 
         // ── Global suspension check for broadcast ──
