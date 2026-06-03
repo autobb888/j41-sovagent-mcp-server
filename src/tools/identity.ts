@@ -10,8 +10,16 @@ import { errorResult } from './error.js';
 // J41-DISPUTE-RESPOND, J41-STATUS) and submit them out-of-band to the platform.
 // Every legitimate protocol action already has a typed tool that builds the
 // canonical message internally — the raw oracle had no irreplaceable use case.
-// `signWithAgent()` in state.ts now also rejects protocol-shaped strings as
-// defense-in-depth for the typed tools.
+//
+// The previous parallel-hardening commit (3243a8f / fcc68db) had kept these
+// tools and applied an `assertNotProtocolMessage` guard inline. That guard's
+// unicode-normalization logic is preserved in src/security/protocol-guard.ts
+// and applied at the choke-point inside `signWithAgent()` in state.ts, so the
+// underlying defense survives without re-exposing the raw oracle.
+//
+// If a future caller legitimately needs to sign opaque text via MCP, add a
+// typed tool that constructs the bytes from validated input — not a generic
+// signing tool over caller-chosen strings.
 
 export function registerIdentityTools(server: McpServer): void {
   server.tool(

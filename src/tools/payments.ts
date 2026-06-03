@@ -1,8 +1,33 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { getAgent, requireState, getIdentityInfo, AgentState, getAllowlist, getRateLimiter } from '../state.js';
+import { getAgent, requireState, getIdentityInfo, AgentState, getAllowlist, getRateLimiter, getActiveJob } from '../state.js';
 import { errorResult } from './error.js';
 import { checkFinancialOp, logBlockedOperation } from '../allowlist.js';
+
+/**
+ * Resolve a destination to the canonical address that funds will actually go
+ * to, BEFORE the allowlist gate runs. R-/i-addresses are already canonical;
+ * VerusIDs (containing '@' or '.') are resolved via the trusted platform.
+ *
+ * Returns the resolved address (to hand to the SDK so it does not re-resolve
+ * to a different value) plus all equivalent candidate forms to check against
+ * the allowlist. Throws (fail-closed) if a VerusID cannot be resolved — an
+ * unverifiable destination must never be sent to.
+ */
+export async function resolveDestination(
+  agent: { client: { getAgentPaymentAddress(id: string): Promise<{ address?: string }> } },
+  to: string,
+): Promise<{ resolved: string; candidates: string[] }> {
+  if (!to.includes('@') && !to.includes('.')) {
+    return { resolved: to, candidates: [to] };
+  }
+  const payInfo = await agent.client.getAgentPaymentAddress(to);
+  const resolved = payInfo?.address;
+  if (!resolved) {
+    throw new Error(`Could not resolve destination "${to}" to a pay address — refusing to send to an unverifiable target`);
+  }
+  return { resolved, candidates: [resolved, to] };
+}
 
 export function registerPaymentTools(server: McpServer): void {
   server.tool(
@@ -91,9 +116,26 @@ export function registerPaymentTools(server: McpServer): void {
           throw new Error('Invalid rawhex — odd-length string is not a valid byte sequence');
         }
 
+        // ── Allowlist bypass guard ──
+        // A raw signed tx has an arbitrary, unparseable destination, so the
+        // financial allowlist CANNOT gate it. Disabled by default to close the
+        // bypass — legitimate sends go through j41_send_currency /
+        // j41_send_multi_payment, which build, sign, and broadcast through the
+        // gated path. Operators who genuinely need external tx construction set
+        // J41_ALLOW_RAW_BROADCAST=1.
+        if (process.env.J41_ALLOW_RAW_BROADCAST !== '1') {
+          const reason = 'Raw broadcast is disabled (cannot be allowlist-gated). Use j41_send_currency/j41_send_multi_payment, or set J41_ALLOW_RAW_BROADCAST=1 to opt in.';
+          logBlockedOperation('j41_broadcast_tx', 'unknown(rawhex)', 0, '_broadcast', reason);
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({
+              error: reason,
+              code: 'FINANCIAL_OP_BLOCKED',
+            }) }],
+            isError: true,
+          };
+        }
+
         // ── Global suspension check for broadcast ──
-        // We cannot reliably parse destination from raw hex without a full tx
-        // deserializer. But we CAN block broadcasts when globally suspended.
         const limiter = getRateLimiter();
         if (limiter.isSuspended()) {
           const reason = 'Financial operations suspended — broadcast_tx blocked';
@@ -236,29 +278,48 @@ export function registerPaymentTools(server: McpServer): void {
     async ({ to, amount }) => {
       try {
         requireState(AgentState.Authenticated);
+        const agent = getAgent();
+
+        // ── Resolve destination BEFORE gating ──
+        // A VerusID is resolved to the canonical pay address the SDK would send
+        // to, so the gate checks the value actually funded (not the friendly
+        // name). Fails closed if the destination cannot be resolved.
+        const { resolved, candidates } = await resolveDestination(agent, to);
 
         // ── Allowlist + rate limit gate ──
-        // Audit 2026-06-02 H-MCP-funds-1: jobPrice=Infinity silently disabled the
-        // total-value cap (`1.1 * Infinity = Infinity`). Use a finite per-call cap.
-        const jobId = '_standalone';
-        const STANDALONE_MAX_VALUE_VRSC = Number(process.env.J41_MCP_STANDALONE_MAX_VRSC ?? '10');
-        if (!Number.isFinite(STANDALONE_MAX_VALUE_VRSC) || STANDALONE_MAX_VALUE_VRSC <= 0) {
-          throw new Error('J41_MCP_STANDALONE_MAX_VRSC must be a positive finite number');
+        // Use active-job context when available so the per-job price ceiling
+        // and rate-limit bucket apply correctly. Without it the gate falls
+        // back to '_standalone'; the per-job price ceiling is then unbounded
+        // but the absolute per-send/per-day caps in checkSend still bound
+        // every send (DEFAULT_RATE_LIMITS.maxAmountPerSend / maxAmountPerDay).
+        //
+        // Audit 2026-06-02 H-MCP-funds-1 supplemental: as a defense-in-depth
+        // hard ceiling for the standalone path (in case env-driven absolute
+        // caps are tuned generously), J41_MCP_STANDALONE_MAX_VRSC bounds a
+        // single send when no active job is present.
+        const active = getActiveJob();
+        const jobId = active?.jobId ?? '_standalone';
+        const jobPrice = active?.amount ?? Infinity;
+        if (!active) {
+          const STANDALONE_MAX_VALUE_VRSC = Number(process.env.J41_MCP_STANDALONE_MAX_VRSC ?? '10');
+          if (!Number.isFinite(STANDALONE_MAX_VALUE_VRSC) || STANDALONE_MAX_VALUE_VRSC <= 0) {
+            throw new Error('J41_MCP_STANDALONE_MAX_VRSC must be a positive finite number');
+          }
+          if (amount > STANDALONE_MAX_VALUE_VRSC) {
+            const reason = `BLOCKED: standalone send amount ${amount} exceeds cap ${STANDALONE_MAX_VALUE_VRSC} VRSC (set J41_MCP_STANDALONE_MAX_VRSC to raise)`;
+            logBlockedOperation('j41_send_currency', resolved, amount, jobId, reason);
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify({
+                error: reason,
+                code: 'FINANCIAL_OP_BLOCKED',
+              }) }],
+              isError: true,
+            };
+          }
         }
-        if (amount > STANDALONE_MAX_VALUE_VRSC) {
-          const reason = `BLOCKED: standalone send amount ${amount} exceeds cap ${STANDALONE_MAX_VALUE_VRSC} VRSC (set J41_MCP_STANDALONE_MAX_VRSC to raise)`;
-          logBlockedOperation('j41_send_currency', to, amount, jobId, reason);
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({
-              error: reason,
-              code: 'FINANCIAL_OP_BLOCKED',
-            }) }],
-            isError: true,
-          };
-        }
-        const gate = checkFinancialOp(to, amount, jobId, STANDALONE_MAX_VALUE_VRSC, getAllowlist(), getRateLimiter());
+        const gate = checkFinancialOp(candidates, amount, jobId, jobPrice, getAllowlist(), getRateLimiter());
         if (!gate.allowed) {
-          logBlockedOperation('j41_send_currency', to, amount, jobId, gate.reason!);
+          logBlockedOperation('j41_send_currency', resolved, amount, jobId, gate.reason!);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify({
               error: gate.reason,
@@ -268,11 +329,15 @@ export function registerPaymentTools(server: McpServer): void {
           };
         }
 
-        const agent = getAgent();
-        // SDK uses agent's own R-address as default change destination — no
-        // operator/LLM override here. If the caller needs custom source/change
-        // addresses, they should drive the SDK directly with explicit auditing.
-        const txid = await agent.sendCurrency(to, amount);
+        // Audit 2026-06-02 C2: sourceAddress + changeAddress have been removed
+        // from this tool's input schema — the allowlist gate only validated
+        // `to`, so accepting an override would let an attacker send dust to an
+        // allowlisted destination and route the entire UTXO change to
+        // themselves. SDK defaults to the agent's own R-address for change.
+        //
+        // Send to the already-resolved address so the SDK cannot re-resolve
+        // to a different target than the one we gated.
+        const txid = await agent.sendCurrency(resolved, amount);
 
         // Record successful send for rate limiting
         getRateLimiter().recordSend(jobId, amount);

@@ -15,10 +15,10 @@
   "scripts": {
     "build": "NODE_OPTIONS='--max-old-space-size=16384' tsc --noCheck",
     "start": "node build/index.js",
-    "test": "tsx --test test/*.test.ts"
+    "test": "NODE_ENV=test tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "@junction41/sovagent-sdk": "2.4.0",
+    "@junction41/sovagent-sdk": "2.5.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^3.24.0"
   },

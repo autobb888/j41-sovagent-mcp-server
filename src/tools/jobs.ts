@@ -1,11 +1,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { checkForCanaryLeak } from '@junction41/sovagent-sdk';
-import { getAgent, requireState, signWithAgentBuilt, AgentState, getAllowlist, getRateLimiter, reloadAllowlist } from '../state.js';
+import { getAgent, requireState, signWithAgentBuilt, AgentState, getAllowlist, getRateLimiter, reloadAllowlist, setActiveJob, clearActiveJob } from '../state.js';
 import { apiRequest } from './api-request.js';
 import { errorResult } from './error.js';
 import { checkFinancialOp, logBlockedOperation, addActiveJobAddress, removeActiveJobAddress, getAllowlistPath } from '../allowlist.js';
 import { getCanaryToken } from './safety.js';
+import { resolveDestination } from './payments.js';
 
 const JOB_STATUS = z.enum([
   'requested', 'accepted', 'in_progress', 'delivered',
@@ -68,6 +69,16 @@ export function registerJobTools(server: McpServer): void {
         const message = `J41-ACCEPT|Job:${jobDetails.jobHash}|Buyer:${jobDetails.buyerVerusId}|Amt:${jobDetails.amount} ${jobDetails.currency}|Ts:${timestamp}|I accept this job and commit to delivering the work.`;
         const signature = signWithAgentBuilt(message);
         const job = await agent.client.acceptJob(jobId, signature, timestamp);
+
+        // ── Active-job context: payment tools default to this jobId/price ──
+        setActiveJob({
+          jobId,
+          jobHash: jobDetails.jobHash ?? null,
+          amount: Number(jobDetails.amount) || 0,
+          currency: jobDetails.currency || 'VRSCTEST',
+          buyerVerusId: jobDetails.buyerVerusId ?? null,
+          acceptedAt: Date.now(),
+        });
 
         // ── Allowlist lifecycle: add buyer refund address ──
         // Audit 2026-06-02 H-MCP-funds-3 / H-MCP-bridge-1: this auto-injects
@@ -155,6 +166,9 @@ export function registerJobTools(server: McpServer): void {
         const signature = signWithAgentBuilt(message);
         const job = await agent.client.completeJob(jobId, signature, timestamp);
 
+        // ── Active-job context: clear ──
+        clearActiveJob(jobId);
+
         // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
         removeActiveJobAddress(getAllowlistPath(), jobId);
         getRateLimiter().clearJob(jobId);
@@ -179,6 +193,9 @@ export function registerJobTools(server: McpServer): void {
         requireState(AgentState.Authenticated);
         const agent = getAgent();
         const job = await agent.client.cancelJob(jobId);
+
+        // ── Active-job context: clear ──
+        clearActiveJob(jobId);
 
         // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
         removeActiveJobAddress(getAllowlistPath(), jobId);
@@ -225,6 +242,12 @@ export function registerJobTools(server: McpServer): void {
         const jobResult = result as any;
 
         // ── Allowlist lifecycle: add seller payment address + platform fee ──
+        // SECURITY: only ever allowlist addresses returned by the trusted
+        // platform API for this job. The agent-supplied `sellerVerusId` is
+        // NEVER added here — doing so would let a prompt-injected agent
+        // self-authorize an arbitrary payout destination and drain the wallet.
+        // If payment legitimately routes to the seller's identity, the platform
+        // returns that address in `payment.address`.
         const jobData = jobResult?.data || jobResult;
         const sellerPayAddr = jobData?.payment?.address;
         const platformFeeAddr = jobData?.payment?.platformFeeAddress;
@@ -234,12 +257,12 @@ export function registerJobTools(server: McpServer): void {
         if (platformFeeAddr) {
           addActiveJobAddress(getAllowlistPath(), `fee-${jobData.id || 'unknown'}`, platformFeeAddr);
         }
-        // Also add the sellerVerusId (i-address) in case payment routes there
-        if (sellerVerusId) {
-          addActiveJobAddress(getAllowlistPath(), `seller-${jobData.id || 'unknown'}`, sellerVerusId);
-        }
         reloadAllowlist();
-        console.error(`[allowlist] Added seller ${sellerPayAddr || sellerVerusId} for job ${jobData.id}`);
+        if (sellerPayAddr) {
+          console.error(`[allowlist] Added platform-confirmed seller address ${sellerPayAddr} for job ${jobData.id}`);
+        } else {
+          console.error(`[allowlist] No platform pay address returned for job ${jobData.id} — nothing allowlisted (sends will be blocked until an address is confirmed)`);
+        }
 
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
@@ -263,6 +286,9 @@ export function registerJobTools(server: McpServer): void {
           'POST',
           `/v1/jobs/${encodeURIComponent(jobId)}/end-session`,
         );
+
+        // ── Active-job context: clear ──
+        clearActiveJob(jobId);
 
         // ── Allowlist lifecycle: remove buyer address + clear rate limit state ──
         removeActiveJobAddress(getAllowlistPath(), jobId);
@@ -321,6 +347,10 @@ export function registerJobTools(server: McpServer): void {
         const message = `J41-DISPUTE|Job:${jobHash}|Reason:${reason}|Ts:${timestamp}|I am raising a dispute on this job.`;
         const signature = signWithAgentBuilt(message);
         const job = await agent.client.disputeJob(jobId, reason, signature, timestamp);
+
+        // ── Active-job context: clear ──
+        clearActiveJob(jobId);
+
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(job, null, 2) }],
         };
@@ -402,16 +432,29 @@ export function registerJobTools(server: McpServer): void {
     async ({ outputs }) => {
       try {
         requireState(AgentState.Authenticated);
+        const agent = getAgent();
+
+        // ── Resolve every destination BEFORE gating ──
+        // Resolve VerusIDs to canonical pay addresses so the gate checks (and
+        // the SDK sends to) the value actually funded. Fails closed on any
+        // unresolvable destination.
+        const resolvedOutputs: Array<{ address: string; amount: number; candidates: string[] }> = [];
+        for (const output of outputs) {
+          const { resolved, candidates } = await resolveDestination(agent, output.address);
+          resolvedOutputs.push({ address: resolved, amount: output.amount, candidates });
+        }
 
         // ── Allowlist gate: check EVERY output address ──
+        // The per-job price ceiling is unbounded here ('_standalone'), but the
+        // absolute per-send/per-day caps in checkSend bound the total spend.
         const allowlist = getAllowlist();
         const limiter = getRateLimiter();
-        const total = outputs.reduce((s: number, o: { amount: number }) => s + o.amount, 0);
+        const total = resolvedOutputs.reduce((s, o) => s + o.amount, 0);
         const jobId = '_standalone';
         const jobPrice = Infinity;
 
-        for (const output of outputs) {
-          const gate = checkFinancialOp(output.address, output.amount, jobId, jobPrice, allowlist, limiter);
+        for (const output of resolvedOutputs) {
+          const gate = checkFinancialOp(output.candidates, output.amount, jobId, jobPrice, allowlist, limiter);
           if (!gate.allowed) {
             logBlockedOperation('j41_send_multi_payment', output.address, output.amount, jobId, gate.reason!);
             return {
@@ -424,8 +467,9 @@ export function registerJobTools(server: McpServer): void {
           }
         }
 
-        const agent = getAgent();
-        const txid = await agent.sendMultiPayment(outputs);
+        const txid = await agent.sendMultiPayment(
+          resolvedOutputs.map((o) => ({ address: o.address, amount: o.amount })),
+        );
 
         // Record the full send
         limiter.recordSend(jobId, total);

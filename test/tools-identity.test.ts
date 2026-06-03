@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeypair, signMessage, signChallenge } from '@junction41/sovagent-sdk';
+import { assertNotProtocolMessage } from '../build/tools/identity.js';
 
 describe('Identity tools (pure functions)', () => {
   it('should generate a valid keypair for verustest', () => {
@@ -48,5 +49,24 @@ describe('Identity tools (pure functions)', () => {
     const sig = signChallenge(kp.wif, 'test-challenge-123', kp.address, 'verustest');
     assert.ok(sig, 'challenge signature should not be empty');
     assert.ok(typeof sig === 'string');
+  });
+});
+
+describe('Signing oracle guard (MEDIUM-4)', () => {
+  it('rejects messages formatted as J41 protocol messages', () => {
+    for (const m of [
+      'J41-ACCEPT|Job:abc|...',
+      'j41-deposit-report|Buyer:x',
+      '  J41-ACCESS-ENVELOPE|Cipher:...',
+      'J41-STATUS|toggle',
+    ]) {
+      assert.throws(() => assertNotProtocolMessage(m), /J41-protocol/i, `should reject: ${m}`);
+    }
+  });
+
+  it('allows ordinary (non-protocol) messages', () => {
+    for (const m of ['hello world', 'sign this please', 'login to acme.com nonce=123', 'j 41 spaced']) {
+      assert.doesNotThrow(() => assertNotProtocolMessage(m), `should allow: ${m}`);
+    }
   });
 });

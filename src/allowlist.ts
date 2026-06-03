@@ -30,6 +30,10 @@ export interface RateLimitConfig {
   maxSendsPerJob: number;
   maxSendsPerHour: number;
   cooldownMs: number;
+  /** Absolute hard cap on a single send (VRSC), independent of job context. */
+  maxAmountPerSend: number;
+  /** Absolute hard cap on total sends over a rolling 24h window (VRSC). */
+  maxAmountPerDay: number;
 }
 
 export interface RateLimitResult {
@@ -46,10 +50,27 @@ interface SendRecord {
 
 const DEFAULT_ALLOWLIST_PATH = path.join(os.homedir(), '.j41', 'financial-allowlist.json');
 
+/**
+ * Parse a positive-number env override, falling back to `fallback` when the
+ * var is unset, non-numeric, or non-positive. Keeps a malformed env var from
+ * silently disabling the cap (which would re-open the drain vector).
+ */
+function envAmount(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
 const DEFAULT_RATE_LIMITS: RateLimitConfig = {
   maxSendsPerJob: 3,
   maxSendsPerHour: 10,
   cooldownMs: 30_000, // 30 seconds
+  // Absolute fund-drain ceilings. These bound EVERY send regardless of job
+  // context, so a missing/Infinity per-job price can never authorize an
+  // unbounded transfer. Operators tune via env for higher-value workloads.
+  maxAmountPerSend: envAmount('J41_MAX_SEND_AMOUNT', 50),
+  maxAmountPerDay: envAmount('J41_MAX_DAILY_AMOUNT', 250),
 };
 
 const EMPTY_ALLOWLIST: FinancialAllowlist = {
@@ -61,33 +82,20 @@ const EMPTY_ALLOWLIST: FinancialAllowlist = {
 // ── Allowlist Loading ──
 
 /**
- * Get the allowlist file path. Uses J41_ALLOWLIST_PATH env var for testing,
- * otherwise defaults to ~/.j41/financial-allowlist.json.
+ * Get the allowlist file path.
  *
- * Audit 2026-06-02 L-MCP-auth-3: if the operator sets J41_ALLOWLIST_PATH,
- * warn loudly if the resolved directory is world-writable or group-writable
- * — a co-tenant could otherwise mutate the allowlist out from under us.
+ * SECURITY (3243a8f): the J41_ALLOWLIST_PATH override is honored ONLY under
+ * NODE_ENV=test. In production it is ignored and the fixed path is used, so a
+ * malicious launcher/MCP-client config cannot repoint the financial allowlist
+ * at an attacker-controlled (or writable) file. This SUPERSEDES the earlier
+ * audit L-MCP-auth-3 "warn on world-writable parent dir" fix — refusing the
+ * override entirely in production is the stronger defense.
  */
-let _allowlistPathWarned = false;
 export function getAllowlistPath(): string {
-  const p = process.env.J41_ALLOWLIST_PATH || DEFAULT_ALLOWLIST_PATH;
-  if (process.env.J41_ALLOWLIST_PATH && !_allowlistPathWarned) {
-    _allowlistPathWarned = true;
-    try {
-      const dir = path.dirname(p);
-      const st = fs.statSync(dir);
-      // Mode bits: world-write = 0o002, group-write = 0o020
-      if ((st.mode & 0o022) !== 0) {
-        console.error(
-          `[allowlist] WARN: J41_ALLOWLIST_PATH directory ${dir} is group- or world-writable ` +
-          `(mode ${(st.mode & 0o777).toString(8)}). Co-tenants can mutate the allowlist.`,
-        );
-      }
-    } catch {
-      // Directory may not exist yet — loadAllowlist creates it with default mode.
-    }
+  if (process.env.NODE_ENV === 'test' && process.env.J41_ALLOWLIST_PATH) {
+    return process.env.J41_ALLOWLIST_PATH;
   }
-  return p;
+  return DEFAULT_ALLOWLIST_PATH;
 }
 
 /**
@@ -99,8 +107,12 @@ export function loadAllowlist(filePath?: string): FinancialAllowlist {
   const p = filePath ?? getAllowlistPath();
 
   if (!fs.existsSync(p)) {
-    // Create deny-all default — Plan A's secure-setup normally creates this,
-    // but if Plan A hasn't run, we bootstrap it here.
+    // Bootstrap a deny-all default. This is fail-safe (every financial op is
+    // blocked until an operator populates the list), but it usually means the
+    // secure-setup step never ran — surface that loudly rather than silently.
+    if (process.env.NODE_ENV !== 'test') {
+      console.error(`[allowlist] No allowlist at ${p} — created deny-all default. Run secure-setup; all financial operations are BLOCKED until addresses are added.`);
+    }
     const dir = path.dirname(p);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(p, JSON.stringify(EMPTY_ALLOWLIST, null, 2), 'utf-8');
@@ -125,16 +137,41 @@ export function loadAllowlist(filePath?: string): FinancialAllowlist {
 // ── Address Checking ──
 
 /**
- * Check if a destination address is in the allowlist.
- * Checks permanent, operator, and active_jobs lists.
+ * Compare an allowlist entry against a candidate destination.
+ *
+ * Base58 R-/i-addresses are case-sensitive, so they match exactly. VerusID
+ * friendly names (e.g. "Alice@") are case-insensitive on-chain, so we compare
+ * those without regard to case. This prevents both a case-flip bypass and a
+ * stored-name vs resolved-address mismatch from silently passing or failing.
  */
-export function isAddressAllowed(list: FinancialAllowlist, address: string): boolean {
-  const allAddresses = [
+function addressMatches(entry: string, candidate: string): boolean {
+  const isVerusId = (s: string) => s.includes('@') || s.includes('.');
+  if (isVerusId(entry) || isVerusId(candidate)) {
+    return entry.toLowerCase() === candidate.toLowerCase();
+  }
+  return entry === candidate;
+}
+
+/**
+ * Check if a destination is in the allowlist. Accepts a single address or a
+ * set of equivalent forms (e.g. the friendly VerusID AND its resolved pay
+ * address) — the destination is allowed if ANY form matches ANY entry.
+ *
+ * Callers MUST resolve a VerusID to its canonical pay address and pass both,
+ * so the value actually funded is the value checked (closes the resolve-after
+ * -check TOCTOU gap).
+ */
+export function isAddressAllowed(
+  list: FinancialAllowlist,
+  address: string | string[],
+): boolean {
+  const candidates = Array.isArray(address) ? address : [address];
+  const entries = [
     ...list.permanent.map((e) => e.address),
     ...list.operator.map((e) => e.address),
     ...list.active_jobs.map((e) => e.address),
   ];
-  return allAddresses.includes(address);
+  return candidates.some((c) => entries.some((e) => addressMatches(e, c)));
 }
 
 // ── Rate Limiter ──
@@ -189,6 +226,25 @@ export class RateLimiter {
 
     const now = Date.now();
 
+    // 0. Absolute ceilings — enforced regardless of job context so a missing
+    //    or Infinity per-job price can never authorize an unbounded transfer.
+    if (amount > this.config.maxAmountPerSend) {
+      return {
+        allowed: false,
+        reason: `Amount ${amount} exceeds max per-send limit (${this.config.maxAmountPerSend} VRSC)`,
+      };
+    }
+    const oneDayAgo = now - 86_400_000;
+    const sentToday = this.globalSends
+      .filter((r) => r.timestamp > oneDayAgo)
+      .reduce((sum, r) => sum + r.amount, 0);
+    if (sentToday + amount > this.config.maxAmountPerDay) {
+      return {
+        allowed: false,
+        reason: `Daily send limit would be exceeded (sent 24h: ${sentToday}, attempted: ${amount}, max: ${this.config.maxAmountPerDay} VRSC)`,
+      };
+    }
+
     // 1. Per-job send count
     const jobHistory = this.jobSends.get(jobId) ?? [];
     if (jobHistory.length >= this.config.maxSendsPerJob) {
@@ -229,12 +285,20 @@ export class RateLimiter {
    * Record a successful send. Call this AFTER the send succeeds.
    */
   recordSend(jobId: string, amount: number): void {
-    const record: SendRecord = { timestamp: Date.now(), amount };
+    const now = Date.now();
+    const record: SendRecord = { timestamp: now, amount };
     if (!this.jobSends.has(jobId)) {
       this.jobSends.set(jobId, []);
     }
     this.jobSends.get(jobId)!.push(record);
     this.globalSends.push(record);
+
+    // Prune entries older than the longest window we query (24h) so the
+    // global history can't grow unbounded over a long-lived process.
+    const oneDayAgo = now - 86_400_000;
+    while (this.globalSends.length > 0 && this.globalSends[0].timestamp <= oneDayAgo) {
+      this.globalSends.shift();
+    }
   }
 
   /**
@@ -264,7 +328,7 @@ export interface AllowlistGateResult {
  * @param rateLimiter - Shared rate limiter instance
  */
 export function checkFinancialOp(
-  address: string,
+  address: string | string[],
   amount: number,
   jobId: string,
   jobPrice: number,
@@ -273,9 +337,10 @@ export function checkFinancialOp(
 ): AllowlistGateResult {
   // 1. Allowlist check
   if (!isAddressAllowed(allowlist, address)) {
+    const shown = Array.isArray(address) ? address.join(' / ') : address;
     return {
       allowed: false,
-      reason: `BLOCKED: Address ${address} is not in the financial allowlist. Only pre-approved addresses can receive funds.`,
+      reason: `BLOCKED: Address ${shown} is not in the financial allowlist. Only pre-approved addresses can receive funds.`,
     };
   }
 
