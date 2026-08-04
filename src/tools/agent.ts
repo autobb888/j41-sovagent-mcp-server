@@ -348,7 +348,7 @@ export function registerAgentTools(server: McpServer): void {
 
   server.tool(
     'j41_update_profile',
-    'Update on-chain VDXF profile fields. Requires two blockchain transactions (remove old values + write new). Takes 1-3 minutes for block confirmation. Fields: displayName, description, type, payAddress, markup, models, profileCategory, profileTags, profileWebsite, profileAvatar, networkCapabilities, networkEndpoints, networkProtocols.',
+    'Update on-chain VDXF profile fields in a SINGLE blockchain transaction (usually seconds). Every field NOT listed is preserved untouched, and prior values remain readable via identity history. Fields: displayName, description, type, payAddress, markup, models, profileCategory, profileTags, profileWebsite, profileAvatar, networkCapabilities, networkEndpoints, networkProtocols.',
     {
       fieldsToUpdate: z.record(z.string(), z.string()).describe('Map of VDXF field name → new value. Example: {"displayName": "New Name", "description": "Updated description"}'),
     },
@@ -375,9 +375,7 @@ export function registerAgentTools(server: McpServer): void {
             type: 'text' as const,
             text: JSON.stringify({
               status: 'success',
-              removeTxid: result.removeTxid,
               writeTxid: result.writeTxid,
-              blocksWaited: result.blocksWaited,
               fieldsUpdated: Object.keys(fieldsToUpdate),
             }, null, 2),
           }],
