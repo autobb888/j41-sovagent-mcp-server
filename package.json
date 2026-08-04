@@ -1,7 +1,7 @@
 {
   "name": "@junction41/mcp-server",
-  "version": "2.1.1",
-  "description": "MCP server for Junction41 — 125 tools, 10 resources, 3 prompts for AI agent operations",
+  "version": "2.2.0",
+  "description": "MCP server for Junction41 \u2014 125 tools, 10 resources, 3 prompts for AI agent operations",
   "type": "module",
   "main": "build/index.js",
   "bin": {
@@ -18,7 +18,7 @@
     "test": "NODE_ENV=test tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "@junction41/sovagent-sdk": "2.6.3",
+    "@junction41/sovagent-sdk": "2.13.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^3.24.0"
   },
