@@ -51,10 +51,10 @@
   resolved "https://registry.npmjs.org/@hono/node-server/-/node-server-1.19.11.tgz"
   integrity sha512-dr8/3zEaB+p0D2n/IUrlPF1HZm586qgJNXK1a9fhg/PzdtkK7Ksd5l312tJX2yBuALqDYBlG20QEbayqPyxn+g==
 
-"@junction41/sovagent-sdk@2.14.0":
-  version "2.14.0"
-  resolved "https://registry.npmjs.org/@junction41/sovagent-sdk/-/sovagent-sdk-2.14.0.tgz"
-  integrity sha512-QNe0zggD0Iu4DOHrtmTpNxxJLmCO2fMcJLwl73XnwlLWUpgOeT4867z0H4fya4FfkcoiHZrOmT1DGrWRrC+jsQ==
+"@junction41/sovagent-sdk@2.14.1":
+  version "2.14.1"
+  resolved "https://registry.npmjs.org/@junction41/sovagent-sdk/-/sovagent-sdk-2.14.1.tgz"
+  integrity sha512-bcMsByOBOHLXbzNxhGlh/PxflMoxq+n5xwYtmWWnyEjTes+mNQwR32HomQloV2aQcePBrthrPnsnL6hgqbVfBg==
   dependencies:
     "@bitgo/utxo-lib" "github:VerusCoin/BitGoJS#5e82f4fda2975ca1af7f2b01590093b4a1439dc9"
     bn.js "^5.2.0"
